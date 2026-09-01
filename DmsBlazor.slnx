@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/DmsBlazor.Api/DmsBlazor.Api.csproj" />
+    <Project Path="src/DmsBlazor.Client/DmsBlazor.Client.csproj" />
+    <Project Path="src/DmsBlazor.Shared/DmsBlazor.Shared.csproj" />
+    <Project Path="src/DmsBlazor.Tests/DmsBlazor.Tests.csproj" />
+  </Folder>
+</Solution>

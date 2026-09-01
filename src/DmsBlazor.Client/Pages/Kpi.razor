@@ -1,0 +1,28 @@
+<div class="kpi-card">
+    <div class="kpi-label">@Label</div>
+    <div class="kpi-value @ToneClass">@Value</div>
+    @if (!string.IsNullOrEmpty(Sub))
+    {
+        <div class="kpi-sub">@Sub</div>
+    }
+</div>
+
+<style>
+    .kpi-card { border: 1px solid #e2e8f0; border-radius: 12px; padding: 1rem 1.25rem; background: #fff; flex: 1; min-width: 160px; }
+    .kpi-label { font-size: 0.85rem; color: #64748b; }
+    .kpi-value { font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem; }
+    .kpi-value.ok { color: #16a34a; }
+    .kpi-value.warn { color: #d97706; }
+    .kpi-value.danger { color: #dc2626; }
+    .kpi-sub { font-size: 0.75rem; color: #94a3b8; margin-top: 0.25rem; }
+    .kpi-row { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
+</style>
+
+@code {
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public string Value { get; set; } = "";
+    [Parameter] public string? Sub { get; set; }
+    [Parameter] public string? Tone { get; set; } // "ok" | "warn" | "danger" | null
+
+    private string ToneClass => Tone ?? "";
+}

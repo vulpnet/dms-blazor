@@ -1,0 +1,209 @@
+@page "/dat-hang"
+@using DmsBlazor.Shared.Models
+@using DmsBlazor.Client.Services
+@inject DmsApiClient Api
+
+<PageTitle>Đặt hàng — DMS</PageTitle>
+
+<h1>Demo Quy trình đặt hàng</h1>
+
+@if (products is null || distributors is null)
+{
+    <p>Đang tải...</p>
+}
+else if (confirmation is not null)
+{
+    <div class="confirm-box">
+        <div class="confirm-icon">✅</div>
+        <h3>Đặt hàng thành công</h3>
+        <p>Mã đơn hàng <b>@confirmation.OrderCode</b></p>
+        <p class="confirm-total">@(confirmation.Total.ToString("N0")).000đ</p>
+        <button class="btn-primary" @onclick="ResetOrder">Tạo đơn khác</button>
+    </div>
+}
+else
+{
+    <div class="channel-tabs">
+        <button class="@(channel == SalesChannel.Npp ? "tab active" : "tab")" @onclick="() => SetChannel(SalesChannel.Npp)">Kênh NPP (nhân viên bán hàng)</button>
+        <button class="@(channel == SalesChannel.Retail ? "tab active" : "tab")" @onclick="() => SetChannel(SalesChannel.Retail)">Kênh bán lẻ (khách tự đặt)</button>
+    </div>
+
+    <div class="order-layout">
+        <div class="order-products">
+            @if (channel == SalesChannel.Npp)
+            {
+                <label>
+                    Tạo đơn cho nhà phân phối
+                    <select @bind="selectedDistributorId">
+                        @foreach (var d in distributors)
+                        {
+                            <option value="@d.Id">@d.Name</option>
+                        }
+                    </select>
+                </label>
+            }
+
+            <div class="product-grid">
+                @foreach (var p in products)
+                {
+                    var qty = cart.GetValueOrDefault(p.Id, 0);
+                    var price = channel == SalesChannel.Npp ? p.PricePerCase : p.PricePerUnit;
+                    var unitLabel = channel == SalesChannel.Npp ? $"thùng ({p.CaseSize} {p.Unit})" : p.Unit;
+                    <div class="product-card">
+                        <div class="product-emoji">@p.Emoji</div>
+                        <div class="product-name">@p.Name</div>
+                        <div class="product-price">@price.ToString("N0")k / @unitLabel</div>
+                        <div class="qty-control">
+                            <button @onclick="() => ChangeQty(p.Id, qty - 1)">−</button>
+                            <input type="number" value="@qty" @onchange="e => ChangeQty(p.Id, int.TryParse(e.Value?.ToString(), out var v) ? v : 0)" />
+                            <button @onclick="() => ChangeQty(p.Id, qty + 1)">+</button>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <div class="promo-note">
+                Khuyến mãi tự động: tổng đơn từ 50 đơn vị giảm 5%, từ 100 giảm 10%. Mua từ 2 sản phẩm, mỗi loại từ 20 trở lên — tặng kèm mỗi loại 1 đơn vị.
+            </div>
+        </div>
+
+        <div class="order-cart">
+            @if (priced is not null)
+            {
+                <h3>Giỏ hàng</h3>
+                @if (priced.Lines.Count == 0)
+                {
+                    <p class="muted">Chưa chọn sản phẩm nào.</p>
+                }
+                else
+                {
+                    @foreach (var line in priced.Lines)
+                    {
+                        <div class="cart-line">
+                            <div>
+                                <div>@line.Product.Emoji @line.Product.Name</div>
+                                <div class="muted">
+                                    @line.Qty × @line.UnitPrice.ToString("N0")k
+                                    @if (line.FreeUnits > 0)
+                                    {
+                                        <span class="free-tag">+ tặng @line.FreeUnits</span>
+                                    }
+                                </div>
+                            </div>
+                            <div>@line.LineTotal.ToString("N0")k</div>
+                        </div>
+                    }
+                }
+
+                <div class="cart-summary">
+                    <div class="row"><span>Tổng số lượng</span><span>@priced.TotalQty</span></div>
+                    <div class="row"><span>Tạm tính</span><span>@priced.Subtotal.ToString("N0")k</span></div>
+                    @if (priced.DiscountPercent > 0)
+                    {
+                        <div class="row discount"><span>Chiết khấu @priced.DiscountPercent%</span><span>-@priced.DiscountAmount.ToString("N0")k</span></div>
+                    }
+                    <div class="row total"><span>Thành tiền</span><span>@priced.Total.ToString("N0")k</span></div>
+                </div>
+
+                <button class="btn-primary full" disabled="@(priced.Lines.Count == 0 || confirming)" @onclick="ConfirmOrder">
+                    @(confirming ? "Đang xử lý..." : "Xác nhận đơn hàng")
+                </button>
+            }
+        </div>
+    </div>
+}
+
+<style>
+    .channel-tabs { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
+    .tab { padding: 0.6rem 1.1rem; border-radius: 999px; border: none; background: #f1f5f9; color: #475569; font-weight: 600; cursor: pointer; }
+    .tab.active { background: #2563eb; color: #fff; }
+    .order-layout { display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; }
+    .product-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-top: 1rem; }
+    .product-card { border: 1px solid #e2e8f0; border-radius: 10px; padding: 0.9rem; }
+    .product-emoji { font-size: 1.5rem; }
+    .product-name { font-weight: 600; margin-top: 0.3rem; }
+    .product-price { color: #2563eb; font-size: 0.85rem; font-weight: 600; margin: 0.3rem 0; }
+    .qty-control { display: flex; align-items: center; gap: 0.4rem; }
+    .qty-control button { width: 28px; height: 28px; border: 1px solid #cbd5e1; background: #fff; border-radius: 6px; cursor: pointer; }
+    .qty-control input { width: 55px; text-align: center; border: 1px solid #cbd5e1; border-radius: 6px; padding: 0.2rem; }
+    .promo-note { margin-top: 1rem; background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; padding: 0.75rem; border-radius: 8px; font-size: 0.82rem; }
+    .order-cart { border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem; align-self: start; }
+    .cart-line { display: flex; justify-content: space-between; font-size: 0.88rem; margin-bottom: 0.6rem; }
+    .free-tag { color: #16a34a; font-weight: 600; margin-left: 0.3rem; }
+    .cart-summary { border-top: 1px solid #e2e8f0; padding-top: 0.75rem; margin-top: 0.75rem; font-size: 0.88rem; }
+    .cart-summary .row { display: flex; justify-content: space-between; margin-bottom: 0.35rem; }
+    .cart-summary .discount { color: #16a34a; }
+    .cart-summary .total { font-weight: 700; font-size: 1rem; border-top: 1px solid #e2e8f0; padding-top: 0.5rem; }
+    .btn-primary.full { width: 100%; margin-top: 1rem; padding: 0.75rem; }
+    .btn-primary { background: #2563eb; color: #fff; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; padding: 0.6rem 1.2rem; }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+    .muted { color: #94a3b8; font-size: 0.85rem; }
+    .confirm-box { max-width: 400px; margin: 2rem auto; text-align: center; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 2rem; }
+    .confirm-icon { font-size: 2rem; }
+    .confirm-total { font-size: 1.3rem; font-weight: 700; color: #166534; }
+</style>
+
+@code {
+    private List<Product>? products;
+    private List<Distributor>? distributors;
+    private SalesChannel channel = SalesChannel.Npp;
+    private int selectedDistributorId;
+    private readonly Dictionary<int, int> cart = [];
+    private PricedOrder? priced;
+    private OrderConfirmation? confirmation;
+    private bool confirming;
+
+    protected override async Task OnInitializedAsync()
+    {
+        products = await Api.GetProductsAsync();
+        distributors = await Api.GetDistributorsAsync();
+        selectedDistributorId = distributors?.FirstOrDefault()?.Id ?? 0;
+        foreach (var p in products ?? [])
+            cart[p.Id] = 0;
+        await RefreshPrice();
+    }
+
+    private void SetChannel(SalesChannel c)
+    {
+        channel = c;
+        foreach (var key in cart.Keys.ToList())
+            cart[key] = 0;
+        confirmation = null;
+        _ = RefreshPrice();
+    }
+
+    private async Task ChangeQty(int productId, int qty)
+    {
+        cart[productId] = Math.Max(0, qty);
+        await RefreshPrice();
+    }
+
+    private async Task RefreshPrice()
+    {
+        var request = BuildRequest();
+        priced = await Api.PriceOrderAsync(request);
+    }
+
+    private async Task ConfirmOrder()
+    {
+        confirming = true;
+        var request = BuildRequest();
+        confirmation = await Api.ConfirmOrderAsync(request);
+        confirming = false;
+    }
+
+    private void ResetOrder()
+    {
+        confirmation = null;
+        foreach (var key in cart.Keys.ToList())
+            cart[key] = 0;
+        _ = RefreshPrice();
+    }
+
+    private CreateOrderRequest BuildRequest() => new()
+    {
+        Channel = channel,
+        DistributorId = channel == SalesChannel.Npp ? selectedDistributorId : null,
+        Lines = cart.Where(kv => kv.Value > 0).Select(kv => new OrderLineInput { ProductId = kv.Key, Qty = kv.Value }).ToList()
+    };
+}

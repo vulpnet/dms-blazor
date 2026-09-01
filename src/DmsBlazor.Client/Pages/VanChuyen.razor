@@ -1,0 +1,161 @@
+@page "/van-chuyen"
+@using DmsBlazor.Shared.Models
+@using DmsBlazor.Client.Services
+@inject DmsApiClient Api
+
+<PageTitle>Vận chuyển — DMS</PageTitle>
+
+<h1>Demo Theo dõi vận chuyển</h1>
+
+@if (shipments is null)
+{
+    <p>Đang tải...</p>
+}
+else
+{
+    <div class="kpi-row">
+        <Kpi Label="Tổng đơn đang theo dõi" Value="@shipments.Count.ToString()" />
+        <Kpi Label="Đơn trễ hẹn" Value="@shipments.Count(s => s.Status == ShipmentStatus.Delayed).ToString()" Tone="danger" />
+        <Kpi Label="Đã giao thành công" Value="@shipments.Count(s => s.Status == ShipmentStatus.Delivered).ToString()" Tone="ok" />
+    </div>
+
+    <div class="filters">
+        <button class="@(statusFilter is null ? "chip active" : "chip")" @onclick="() => SetStatusFilter(null)">Tất cả</button>
+        @foreach (var st in Enum.GetValues<ShipmentStatus>())
+        {
+            <button class="@(statusFilter == st ? "chip active" : "chip")" @onclick="() => SetStatusFilter(st)">@StatusLabel(st)</button>
+        }
+    </div>
+
+    <div class="shipment-layout">
+        <div class="shipment-list">
+            @foreach (var s in filtered)
+            {
+                <button class="@(selected?.Id == s.Id ? "ship-item selected" : "ship-item")" @onclick="() => selected = s">
+                    <div class="ship-row">
+                        <b>@s.Code</b>
+                        <span class="badge @StatusBadgeClass(s.Status)">@StatusLabel(s.Status)</span>
+                    </div>
+                    <div>@s.Distributor</div>
+                    <div class="muted">@s.Region · @EtaLabel(s.EtaHours)</div>
+                </button>
+            }
+        </div>
+
+        <div class="shipment-detail">
+            @if (selected is not null)
+            {
+                <div class="detail-header">
+                    <div>
+                        <h3>@selected.Code</h3>
+                        <div class="muted">@selected.Distributor</div>
+                    </div>
+                    <span class="badge @StatusBadgeClass(selected.Status)">@StatusLabel(selected.Status)</span>
+                </div>
+
+                <div class="detail-meta">
+                    <div><span class="muted">Tài xế</span><div>@selected.Driver</div></div>
+                    <div><span class="muted">Phương tiện</span><div>@selected.Vehicle</div></div>
+                    <div><span class="muted">Quãng đường</span><div>@selected.DistanceKm km</div></div>
+                </div>
+
+                <div class="route">
+                    <div class="route-labels"><span>🏭 Kho tổng</span><span>📍 Điểm giao</span></div>
+                    <div class="route-track">
+                        <div class="route-fill" style="width:@selected.ProgressPercent%; background:@(selected.Status == ShipmentStatus.Delayed ? "#dc2626" : selected.ProgressPercent >= 100 ? "#16a34a" : "#2563eb")"></div>
+                    </div>
+                </div>
+
+                <h4>Lộ trình chi tiết</h4>
+                <ol class="timeline">
+                    @foreach (var step in selected.Timeline)
+                    {
+                        <li class="@(step.Delayed ? "delayed" : step.Done ? "done" : "")">
+                            <span class="dot">@(step.Delayed ? "!" : step.Done ? "✓" : "")</span>
+                            <div>
+                                <div class="step-label">@step.Label</div>
+                                <div class="muted">@step.Time</div>
+                            </div>
+                        </li>
+                    }
+                </ol>
+            }
+        </div>
+    </div>
+}
+
+<style>
+    .filters { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 1rem 0; }
+    .chip { padding: 0.4rem 0.9rem; border-radius: 999px; border: none; background: #f1f5f9; color: #475569; cursor: pointer; font-size: 0.85rem; }
+    .chip.active { background: #2563eb; color: #fff; }
+    .shipment-layout { display: grid; grid-template-columns: 1fr 1.4fr; gap: 1.5rem; }
+    .shipment-list { display: flex; flex-direction: column; gap: 0.5rem; }
+    .ship-item { text-align: left; border: 1px solid #e2e8f0; border-radius: 10px; padding: 0.8rem; background: #fff; cursor: pointer; }
+    .ship-item.selected { border-color: #2563eb; background: #eff6ff; }
+    .ship-row { display: flex; justify-content: space-between; margin-bottom: 0.3rem; }
+    .badge { font-size: 0.72rem; padding: 0.2rem 0.55rem; border-radius: 999px; font-weight: 600; }
+    .badge.picked { background: #f1f5f9; color: #475569; }
+    .badge.transit { background: #dbeafe; color: #1e40af; }
+    .badge.delivery { background: #fef3c7; color: #92400e; }
+    .badge.delivered { background: #dcfce7; color: #166534; }
+    .badge.delayed { background: #fee2e2; color: #991b1b; }
+    .badge.ok { background: #dcfce7; color: #166534; }
+    .badge.danger { background: #fee2e2; color: #991b1b; }
+    .shipment-detail { border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem; }
+    .detail-header { display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem; }
+    .detail-meta { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-bottom: 1.25rem; font-size: 0.88rem; }
+    .route-labels { display: flex; justify-content: space-between; font-size: 0.78rem; color: #64748b; }
+    .route-track { position: relative; height: 8px; background: #e2e8f0; border-radius: 999px; margin: 0.4rem 0 1.25rem; }
+    .route-fill { position: absolute; inset: 0 auto 0 0; border-radius: 999px; transition: width 0.3s; }
+    .timeline { list-style: none; padding: 0; margin: 0.5rem 0 0; }
+    .timeline li { display: flex; gap: 0.6rem; margin-bottom: 0.9rem; }
+    .timeline .dot { width: 24px; height: 24px; border-radius: 999px; background: #f1f5f9; color: #94a3b8; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; flex-shrink: 0; }
+    .timeline li.done .dot { background: #dcfce7; color: #166534; }
+    .timeline li.delayed .dot { background: #fee2e2; color: #991b1b; }
+    .step-label { font-size: 0.9rem; font-weight: 600; }
+    .muted { color: #94a3b8; font-size: 0.82rem; }
+</style>
+
+@code {
+    private List<Shipment>? shipments;
+    private List<Shipment> filtered = [];
+    private ShipmentStatus? statusFilter;
+    private Shipment? selected;
+
+    protected override async Task OnInitializedAsync()
+    {
+        shipments = await Api.GetShipmentsAsync();
+        filtered = shipments ?? [];
+        selected = filtered.FirstOrDefault();
+    }
+
+    private void SetStatusFilter(ShipmentStatus? status)
+    {
+        statusFilter = status;
+        filtered = status is null ? shipments ?? [] : (shipments ?? []).Where(s => s.Status == status).ToList();
+        selected = filtered.FirstOrDefault();
+    }
+
+    private static string StatusLabel(ShipmentStatus s) => s switch
+    {
+        ShipmentStatus.PickedUp => "Đã lấy hàng",
+        ShipmentStatus.InTransit => "Đang vận chuyển",
+        ShipmentStatus.OutForDelivery => "Đang giao hàng",
+        ShipmentStatus.Delivered => "Đã giao",
+        ShipmentStatus.Delayed => "Trễ hẹn",
+        _ => s.ToString()
+    };
+
+    private static string StatusBadgeClass(ShipmentStatus s) => s switch
+    {
+        ShipmentStatus.PickedUp => "picked",
+        ShipmentStatus.InTransit => "transit",
+        ShipmentStatus.OutForDelivery => "delivery",
+        ShipmentStatus.Delivered => "delivered",
+        ShipmentStatus.Delayed => "delayed",
+        _ => ""
+    };
+
+    private static string EtaLabel(double hours) =>
+        hours < 0 ? $"Trễ {Math.Abs(hours):0.0} giờ" : hours == 0 ? "Đã hoàn tất" : $"Còn {hours:0.0} giờ";
+}

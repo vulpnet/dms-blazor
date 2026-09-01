@@ -1,0 +1,129 @@
+@page "/dashboard"
+@using DmsBlazor.Shared.Models
+@using DmsBlazor.Client.Services
+@inject DmsApiClient Api
+
+<PageTitle>Báo cáo quản trị — DMS</PageTitle>
+
+<h1>Báo cáo quản trị</h1>
+
+@if (data is null)
+{
+    <p>Đang tải...</p>
+}
+else
+{
+    <div class="tabs">
+        @foreach (var t in tabs)
+        {
+            <button class="@(activeTab == t ? "tab active" : "tab")" @onclick="() => activeTab = t">@t</button>
+        }
+    </div>
+
+    @if (activeTab == "Doanh số & Đơn hàng")
+    {
+        <div class="kpi-row">
+            <Kpi Label="Doanh thu tháng này" Value="6.210 triệu đ" Sub="+5,4% so với tháng trước" />
+            <Kpi Label="Số đơn hàng" Value="3.284 đơn" Sub="Trung bình 1,9 triệu đ/đơn" />
+            <Kpi Label="Đạt mục tiêu" Value="112,9%" Sub="Mục tiêu: 5.500 triệu đ" Tone="ok" />
+        </div>
+
+        <div class="card">
+            <h3>Doanh thu 6 tháng gần nhất</h3>
+            <BarChart Items="@(data.MonthlyRevenue.Select(m => (m.Month, (double)m.Revenue)).ToList())" Color="#2563eb" />
+        </div>
+
+        <div class="card">
+            <h3>Top sản phẩm bán chạy</h3>
+            <table class="data-table">
+                <thead><tr><th>Sản phẩm</th><th>Sản lượng (thùng)</th><th>Doanh thu (triệu đ)</th></tr></thead>
+                <tbody>
+                    @foreach (var p in data.TopProducts)
+                    {
+                        <tr><td>@p.Name</td><td>@p.Units.ToString("N0")</td><td>@p.Revenue.ToString("N0")</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else if (activeTab == "Tồn kho")
+    {
+        <div class="kpi-row">
+            <Kpi Label="NPP sắp hết hàng" Value="@data.InventoryStatus.Count(i => i.Status == "sắp hết").ToString()" Tone="danger" />
+            <Kpi Label="NPP tồn dư" Value="@data.InventoryStatus.Count(i => i.Status == "tồn dư").ToString()" Tone="warn" />
+            <Kpi Label="NPP ổn định" Value="@data.InventoryStatus.Count(i => i.Status == "ổn định").ToString()" Tone="ok" />
+        </div>
+        <div class="card">
+            <h3>Mức tồn kho theo nhà phân phối (%)</h3>
+            @foreach (var inv in data.InventoryStatus)
+            {
+                <div class="hbar-row">
+                    <span class="hbar-label">@inv.Distributor</span>
+                    <div class="hbar-track">
+                        <div class="hbar-fill" style="width:@(Math.Min(100, inv.StockLevel))%; background:@InventoryColor(inv.Status)"></div>
+                    </div>
+                    <span class="hbar-value">@inv.StockLevel%</span>
+                </div>
+            }
+        </div>
+    }
+    else if (activeTab == "Công nợ")
+    {
+        <div class="kpi-row">
+            <Kpi Label="Tổng công nợ" Value="@($"{data.DebtStatus.Sum(d => d.CurrentDebt):N0} triệu đ")" />
+            <Kpi Label="Nợ quá hạn" Value="@($"{data.DebtStatus.Sum(d => d.Overdue):N0} triệu đ")" Tone="danger" />
+            <Kpi Label="NPP vượt hạn mức" Value="@data.DebtStatus.Count(d => d.CurrentDebt > d.CreditLimit).ToString()" Tone="warn" />
+        </div>
+        <div class="card">
+            <h3>Công nợ theo nhà phân phối</h3>
+            <table class="data-table">
+                <thead><tr><th>Nhà phân phối</th><th>Hạn mức</th><th>Công nợ</th><th>Quá hạn</th><th>Trạng thái</th></tr></thead>
+                <tbody>
+                    @foreach (var d in data.DebtStatus)
+                    {
+                        var overLimit = d.CurrentDebt > d.CreditLimit;
+                        <tr>
+                            <td>@d.Distributor</td>
+                            <td>@d.CreditLimit.ToString("N0") tr</td>
+                            <td>@d.CurrentDebt.ToString("N0") tr</td>
+                            <td>@(d.Overdue > 0 ? $"{d.Overdue:N0} tr" : "—")</td>
+                            <td><span class="@(overLimit ? "badge danger" : "badge ok")">@(overLimit ? "Vượt hạn mức" : "Bình thường")</span></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else if (activeTab == "Vận chuyển & Giao hàng")
+    {
+        var s = data.DeliverySummary;
+        <div class="kpi-row">
+            <Kpi Label="Tổng đơn 7 ngày" Value="@s.TotalOrders.ToString("N0")" />
+            <Kpi Label="Tỷ lệ đúng hẹn" Value="@($"{s.OnTimeRate}%")" Tone="ok" />
+            <Kpi Label="Thời gian giao TB" Value="@($"{s.AvgDeliveryHours} giờ")" />
+            <Kpi Label="Đang vận chuyển" Value="@s.ActiveShipments.ToString()" />
+        </div>
+        <div class="card">
+            <h3>Giao hàng đúng hẹn theo ngày</h3>
+            <BarChart Items="@(data.DeliveryStats.Select(d => (d.Day, (double)d.OnTime)).ToList())" Color="#16a34a" />
+        </div>
+    }
+}
+
+@code {
+    private DashboardData? data;
+    private readonly string[] tabs = ["Doanh số & Đơn hàng", "Tồn kho", "Công nợ", "Vận chuyển & Giao hàng"];
+    private string activeTab = "Doanh số & Đơn hàng";
+
+    protected override async Task OnInitializedAsync()
+    {
+        data = await Api.GetDashboardAsync();
+    }
+
+    private static string InventoryColor(string status) => status switch
+    {
+        "sắp hết" => "#dc2626",
+        "tồn dư" => "#f59e0b",
+        _ => "#16a34a"
+    };
+}
