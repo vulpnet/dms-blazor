@@ -26,6 +26,23 @@ nối, khó tìm nơi host miễn phí thật sự. Đổi lại phải tự vi�
 - **Đặt hàng** (`/dat-hang`) — 2 kênh (NPP sỉ / bán lẻ), engine tính giá dùng chung
 - **Theo dõi vận chuyển** (`/van-chuyen`) — danh sách + lọc trạng thái/khu vực + timeline
 
+## Đơn hàng — lưu thật, có mã tăng dần, in được phiếu
+
+Khác bản demo ban đầu (chỉ sinh mã ngẫu nhiên, không lưu gì), đặt hàng giờ tạo **đơn hàng thật**
+trong Postgres:
+
+- **Mã đơn tăng dần theo năm** dạng `DH-2026-0001` — sinh bằng Postgres sequence
+  (`order_number_seq`, xem `OrderCodeGenerator.cs`), atomic ở tầng DB nên an toàn khi nhiều
+  người đặt hàng cùng lúc (không đếm bằng tay ở code C#, tránh race condition)
+- **`Order`/`OrderLine`** lưu SNAPSHOT tên/giá sản phẩm tại thời điểm đặt — đơn hàng cũ không
+  bị đổi nếu sau này sửa/xoá sản phẩm gốc trong `/san-pham`
+- **`/don-hang`** — danh sách lịch sử đơn hàng, mới nhất trước
+- **`/don-hang/{code}`** — chi tiết 1 đơn + nút **In phiếu** (dùng `window.print()` của trình
+  duyệt, CSS `@media print` ẩn sidebar/menu chỉ in đúng phần phiếu — không cần thư viện PDF
+  riêng)
+
+Sau khi đặt hàng thành công ở `/dat-hang`, tự động chuyển sang trang chi tiết đơn vừa tạo.
+
 **Logic tính giá/khuyến mãi** (`DmsBlazor.Shared/Services/OrderPricingService.cs`) port
 nguyên văn từ `pricing.ts` bên bản Next.js, verify lại bằng 5 unit test khớp đúng kết quả đã
 test ở bản gốc:
@@ -134,17 +151,19 @@ src/
     Models/           Product, Order, Shipment, Dashboard...
     Services/         OrderPricingService.cs — logic tính giá/khuyến mãi
   DmsBlazor.Api/
-    Controllers/       CatalogController, DashboardController, OrdersController,
+    Controllers/       CatalogController, DashboardController, OrdersController (tạo/xem đơn),
                        ShipmentsController, ProductsController (CRUD quản lý sản phẩm)
-    Data/DmsDbContext.cs    EF Core DbContext — map Distributor/Product/Shipment vào Postgres
-    Data/DbInitializer.cs   Tự áp dụng migration + seed dữ liệu mẫu khi khởi động
-    Data/MockData.cs        Dữ liệu SEED (không còn bị đọc trực tiếp) + GetDashboard() tĩnh
+    Data/DmsDbContext.cs        EF Core DbContext — map Distributor/Product/Shipment/Order vào Postgres
+    Data/DbInitializer.cs       Tự áp dụng migration + seed dữ liệu mẫu khi khởi động
+    Data/OrderCodeGenerator.cs  Sinh mã đơn DH-2026-0001 bằng Postgres sequence (atomic)
+    Data/MockData.cs            Dữ liệu SEED (không còn bị đọc trực tiếp) + GetDashboard() tĩnh
     Migrations/             EF Core Migrations — tạo mới bằng 'dotnet ef migrations add'
     Program.cs         Cấu hình CORS + bind cổng theo biến PORT (Render) + đăng ký DbContext
     Dockerfile          Build image cho Render — build context phải là thư mục gốc dms-blazor/
     appsettings.Production.json   AllowedOrigins — điền URL Vercel thật sau khi deploy
   DmsBlazor.Client/
-    Pages/             Home, Dashboard, DatHang, VanChuyen, SanPham (quản lý sản phẩm CRUD)
+    Pages/             Home, Dashboard, DatHang, VanChuyen, SanPham (quản lý sản phẩm CRUD),
+                       DonHang (lịch sử đơn), DonHangChiTiet (chi tiết + in phiếu)
                        + component dùng chung (Kpi, BarChart)
     Services/DmsApiClient.cs   Gọi API tập trung, không rải HttpClient khắp các trang
     wwwroot/appsettings.json              Cấu hình ApiBaseUrl cho local dev

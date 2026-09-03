@@ -8,6 +8,8 @@ public class DmsDbContext(DbContextOptions<DmsDbContext> options) : DbContext(op
     public DbSet<Distributor> Distributors => Set<Distributor>();
     public DbSet<Product> Products => Set<Product>();
     public DbSet<Shipment> Shipments => Set<Shipment>();
+    public DbSet<Order> Orders => Set<Order>();
+    public DbSet<OrderLine> OrderLines => Set<OrderLine>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -43,6 +45,32 @@ public class DmsDbContext(DbContextOptions<DmsDbContext> options) : DbContext(op
             // Timeline là danh sách mốc thời gian gắn chặt với 1 đơn vận chuyển,
             // không cần tách bảng riêng — lưu dạng JSON column cho gọn.
             e.OwnsMany(x => x.Timeline, tl => tl.ToJson());
+        });
+
+        // Sequence Postgres cho số thứ tự đơn hàng — atomic ở tầng DB, an toàn khi
+        // nhiều người đặt hàng cùng lúc (không cần tự lock/đếm bằng tay ở code C#).
+        modelBuilder.HasSequence<int>("order_number_seq").StartsAt(1).IncrementsBy(1);
+
+        modelBuilder.Entity<Order>(e =>
+        {
+            e.ToTable("orders");
+            e.Property(x => x.OrderCode).HasMaxLength(30).IsRequired();
+            e.HasIndex(x => x.OrderCode).IsUnique();
+            e.Property(x => x.DistributorName).HasMaxLength(200);
+            e.Property(x => x.Subtotal).HasPrecision(14, 2);
+            e.Property(x => x.DiscountAmount).HasPrecision(14, 2);
+            e.Property(x => x.Total).HasPrecision(14, 2);
+            e.HasMany(x => x.Lines).WithOne().HasForeignKey(l => l.OrderId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<OrderLine>(e =>
+        {
+            e.ToTable("order_lines");
+            e.Property(x => x.ProductCode).HasMaxLength(50).IsRequired();
+            e.Property(x => x.ProductName).HasMaxLength(200).IsRequired();
+            e.Property(x => x.Unit).HasMaxLength(30).IsRequired();
+            e.Property(x => x.UnitPrice).HasPrecision(12, 2);
+            e.Property(x => x.LineTotal).HasPrecision(14, 2);
         });
     }
 }

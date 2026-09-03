@@ -2,6 +2,7 @@
 @using DmsBlazor.Shared.Models
 @using DmsBlazor.Client.Services
 @inject DmsApiClient Api
+@inject NavigationManager Nav
 
 <PageTitle>Đặt hàng — DMS</PageTitle>
 
@@ -15,16 +16,6 @@
     <div class="skeleton-row">
         <div class="skeleton-card"></div>
         <div class="skeleton-card"></div>
-    </div>
-}
-else if (confirmation is not null)
-{
-    <div class="confirm-box">
-        <div class="confirm-icon">✅</div>
-        <h3>Đặt hàng thành công</h3>
-        <p>Mã đơn hàng <b>@confirmation.OrderCode</b></p>
-        <p class="confirm-total">@(confirmation.Total.ToString("N0")).000đ</p>
-        <button class="btn-primary" @onclick="ResetOrder">Tạo đơn khác</button>
     </div>
 }
 else
@@ -110,6 +101,11 @@ else
                     }
                     <div class="row total"><span>Thành tiền</span><span>@priced.Total.ToString("N0")k</span></div>
                 </div>
+
+                @if (confirmError is not null)
+                {
+                    <div class="alert-error">@confirmError</div>
+                }
 
                 <button class="btn-primary full" disabled="@(priced.Lines.Count == 0 || confirming)" @onclick="ConfirmOrder">
                     @(confirming ? "Đang xử lý..." : "Xác nhận đơn hàng")
@@ -229,18 +225,6 @@ else
     .btn-primary.full { width: 100%; margin-top: 1.1rem; padding: 0.8rem; }
     .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
     .muted { color: var(--muted); font-size: 0.83rem; }
-    .confirm-box {
-        max-width: 420px;
-        margin: 2.5rem auto;
-        text-align: center;
-        background: var(--success-soft);
-        border: 1px solid #b7e4c9;
-        border-radius: var(--radius);
-        padding: 2.25rem 2rem;
-    }
-    .confirm-icon { font-size: 2.2rem; margin-bottom: 0.5rem; }
-    .confirm-box h3 { margin-bottom: 0.5rem; }
-    .confirm-total { font-size: 1.4rem; font-weight: 700; color: var(--success); margin: 0.5rem 0 1.25rem; }
 </style>
 
 @code {
@@ -250,8 +234,8 @@ else
     private int selectedDistributorId;
     private readonly Dictionary<int, int> cart = [];
     private PricedOrder? priced;
-    private OrderConfirmation? confirmation;
     private bool confirming;
+    private string? confirmError;
 
     protected override async Task OnInitializedAsync()
     {
@@ -268,7 +252,7 @@ else
         channel = c;
         foreach (var key in cart.Keys.ToList())
             cart[key] = 0;
-        confirmation = null;
+        confirmError = null;
         _ = RefreshPrice();
     }
 
@@ -287,17 +271,18 @@ else
     private async Task ConfirmOrder()
     {
         confirming = true;
+        confirmError = null;
         var request = BuildRequest();
-        confirmation = await Api.ConfirmOrderAsync(request);
+        var (order, error) = await Api.ConfirmOrderAsync(request);
         confirming = false;
-    }
 
-    private void ResetOrder()
-    {
-        confirmation = null;
-        foreach (var key in cart.Keys.ToList())
-            cart[key] = 0;
-        _ = RefreshPrice();
+        if (order is null)
+        {
+            confirmError = error ?? "Đặt hàng không thành công.";
+            return;
+        }
+
+        Nav.NavigateTo($"/don-hang/{order.OrderCode}");
     }
 
     private CreateOrderRequest BuildRequest() => new()

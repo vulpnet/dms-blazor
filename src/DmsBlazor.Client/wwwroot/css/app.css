@@ -105,6 +105,13 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
     }
 }
 
+/* In phiếu (đơn hàng...) — ẩn toàn bộ khung điều hướng, chỉ in đúng nội dung
+   trang đánh dấu .print-area (xem DonHangChiTiet.razor) */
+@media print {
+    .sidebar, .top-row { display: none !important; }
+    .content { padding: 0 !important; max-width: 100% !important; }
+}
+
 #blazor-error-ui {
     color-scheme: light only;
     background: var(--warning-soft);
@@ -301,6 +308,16 @@ code {
     text-align: right;
     color: var(--muted);
     font-weight: 600;
+}
+
+.alert-error {
+    background: var(--danger-soft);
+    color: var(--danger);
+    border: 1px solid #f3c1cb;
+    border-radius: 8px;
+    padding: 0.7rem 1rem;
+    font-size: 0.85rem;
+    margin-bottom: 1rem;
 }
 
 /* Toggle switch — bật/tắt "Đang bán" ngay trong bảng, không cần mở form */

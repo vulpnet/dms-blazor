@@ -1,0 +1,162 @@
+@page "/don-hang/{Code}"
+@using DmsBlazor.Shared.Models
+@using DmsBlazor.Client.Services
+@inject DmsApiClient Api
+@inject IJSRuntime JS
+
+<PageTitle>Đơn hàng @Code — DMS</PageTitle>
+
+@if (order is null && !notFound)
+{
+    <div class="skeleton-row"><div class="skeleton-card"></div></div>
+}
+else if (notFound)
+{
+    <div class="alert-error">Không tìm thấy đơn hàng <b>@Code</b>.</div>
+    <a href="/don-hang" class="btn-outline">← Về danh sách đơn hàng</a>
+}
+else
+{
+    <div class="no-print">
+        <div class="page-header page-header-row">
+            <div>
+                <h1>Đơn hàng @order!.OrderCode</h1>
+                <p>Đặt lúc @order.CreatedAt.ToLocalTime().ToString("HH:mm dd/MM/yyyy")</p>
+            </div>
+            <div class="header-actions">
+                <a href="/don-hang" class="btn-outline">← Danh sách đơn</a>
+                <button class="btn-primary" @onclick="Print">🖨️ In phiếu</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="print-area">
+        <div class="print-header">
+            <h2>PHIẾU ĐẶT HÀNG</h2>
+            <div class="print-meta">
+                <div><b>Mã đơn:</b> @order.OrderCode</div>
+                <div><b>Ngày đặt:</b> @order.CreatedAt.ToLocalTime().ToString("HH:mm dd/MM/yyyy")</div>
+                <div><b>Kênh:</b> @(order.Channel == SalesChannel.Npp ? "Nhà phân phối (bán sỉ)" : "Bán lẻ")</div>
+                @if (!string.IsNullOrEmpty(order.DistributorName))
+                {
+                    <div><b>Nhà phân phối:</b> @order.DistributorName</div>
+                }
+            </div>
+        </div>
+
+        <table class="data-table print-table">
+            <thead>
+                <tr>
+                    <th>Sản phẩm</th>
+                    <th>Đơn vị</th>
+                    <th class="text-right">SL</th>
+                    <th class="text-right">Đơn giá</th>
+                    <th class="text-right">Thành tiền</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var line in order.Lines)
+                {
+                    <tr>
+                        <td>@line.Emoji @line.ProductName</td>
+                        <td>@line.Unit</td>
+                        <td class="text-right">
+                            @line.Qty
+                            @if (line.FreeUnits > 0)
+                            {
+                                <span class="free-tag">+@line.FreeUnits tặng</span>
+                            }
+                        </td>
+                        <td class="text-right">@line.UnitPrice.ToString("N0")k</td>
+                        <td class="text-right">@line.LineTotal.ToString("N0")k</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <div class="print-summary">
+            <div class="row"><span>Tổng số lượng</span><span>@order.TotalQty</span></div>
+            <div class="row"><span>Tạm tính</span><span>@order.Subtotal.ToString("N0")k</span></div>
+            @if (order.DiscountPercent > 0)
+            {
+                <div class="row discount"><span>Chiết khấu @order.DiscountPercent%</span><span>-@order.DiscountAmount.ToString("N0")k</span></div>
+            }
+            <div class="row total"><span>Tổng thanh toán</span><span>@order.Total.ToString("N0")k</span></div>
+        </div>
+
+        <div class="print-signature">
+            <div>
+                <div class="sign-label">Người đặt hàng</div>
+                <div class="sign-space"></div>
+            </div>
+            <div>
+                <div class="sign-label">Xác nhận giao hàng</div>
+                <div class="sign-space"></div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .header-actions { display: flex; gap: 0.6rem; align-items: center; }
+    .btn-outline {
+        border: 1px solid var(--line-strong); color: var(--ink); background: var(--surface);
+        padding: 0.55rem 1rem; border-radius: 8px; font-weight: 600; font-size: 0.85rem; text-decoration: none;
+        display: inline-block;
+    }
+    .btn-outline:hover { border-color: var(--brand); text-decoration: none; }
+    .btn-primary {
+        background: var(--brand); color: #fff; border: none; border-radius: 8px;
+        padding: 0.6rem 1.2rem; font-weight: 600; cursor: pointer; font-size: 0.85rem;
+    }
+
+    .print-area {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 2rem;
+        max-width: 720px;
+    }
+    .print-header { text-align: center; margin-bottom: 1.5rem; border-bottom: 2px solid var(--ink); padding-bottom: 1rem; }
+    .print-header h2 { font-size: 1.3rem; letter-spacing: 0.05em; }
+    .print-meta { margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.88rem; }
+    .print-table { margin-bottom: 1.25rem; }
+    .text-right { text-align: right; }
+    .free-tag { display: block; font-size: 0.72rem; color: var(--success); }
+    .print-summary { max-width: 320px; margin-left: auto; font-size: 0.9rem; }
+    .print-summary .row { display: flex; justify-content: space-between; margin-bottom: 0.4rem; }
+    .print-summary .discount { color: var(--success); }
+    .print-summary .total { font-weight: 700; font-size: 1.05rem; border-top: 1px solid var(--line); padding-top: 0.5rem; margin-top: 0.3rem; }
+    .print-signature { display: flex; justify-content: space-between; margin-top: 3rem; text-align: center; }
+    .print-signature > div { width: 45%; }
+    .sign-label { font-weight: 600; font-size: 0.85rem; margin-bottom: 3rem; }
+    .sign-space { border-top: 1px dashed var(--line-strong); }
+
+    /* Khi in: ẩn nút bấm/header trang này. Ẩn sidebar + top-row của layout chung
+       nằm ở app.css (áp dụng toàn site, không riêng trang này). */
+    @@media print {
+        .no-print { display: none !important; }
+        .print-area { border: none; padding: 0; max-width: 100%; }
+    }
+</style>
+
+@code {
+    [Parameter] public string Code { get; set; } = "";
+
+    private Order? order;
+    private bool notFound;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        order = null;
+        notFound = false;
+        var result = await Api.GetOrderByCodeAsync(Code);
+        if (result is null) notFound = true;
+        else order = result;
+    }
+
+    private async Task Print()
+    {
+        await JS.InvokeVoidAsync("print");
+    }
+}

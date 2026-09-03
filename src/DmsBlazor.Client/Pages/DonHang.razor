@@ -1,0 +1,91 @@
+@page "/don-hang"
+@using DmsBlazor.Shared.Models
+@using DmsBlazor.Client.Services
+@inject DmsApiClient Api
+
+<PageTitle>Đơn hàng — DMS</PageTitle>
+
+<div class="page-header page-header-row">
+    <div>
+        <h1>Đơn hàng đã đặt</h1>
+        <p>Lịch sử toàn bộ đơn hàng, mới nhất hiện trước.</p>
+    </div>
+    <a href="/dat-hang" class="btn-primary">+ Tạo đơn mới</a>
+</div>
+
+@if (orders is null)
+{
+    <div class="skeleton-row">
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+    </div>
+}
+else if (orders.Count == 0)
+{
+    <p class="muted">Chưa có đơn hàng nào. Bấm "Tạo đơn mới" để bắt đầu.</p>
+}
+else
+{
+    <div class="card">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Mã đơn</th>
+                    <th>Ngày đặt</th>
+                    <th>Kênh</th>
+                    <th>Nhà phân phối</th>
+                    <th class="text-right">Số lượng</th>
+                    <th class="text-right">Tổng tiền</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var o in orders)
+                {
+                    <tr>
+                        <td><code>@o.OrderCode</code></td>
+                        <td>@o.CreatedAt.ToLocalTime().ToString("HH:mm dd/MM/yyyy")</td>
+                        <td>
+                            <span class="channel-badge @(o.Channel == SalesChannel.Npp ? "npp" : "retail")">
+                                @(o.Channel == SalesChannel.Npp ? "NPP" : "Bán lẻ")
+                            </span>
+                        </td>
+                        <td>@(o.DistributorName ?? "—")</td>
+                        <td class="text-right">@o.TotalQty</td>
+                        <td class="text-right">@o.Total.ToString("N0")k</td>
+                        <td class="row-actions">
+                            <a href="/don-hang/@o.OrderCode" class="btn-link">Xem chi tiết</a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+<style>
+    .page-header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
+    .btn-primary {
+        background: var(--brand); color: #fff; border: none; border-radius: 8px;
+        padding: 0.6rem 1.2rem; font-weight: 600; cursor: pointer; font-size: 0.85rem;
+        text-decoration: none; display: inline-block;
+    }
+    .btn-primary:hover { text-decoration: none; background: var(--brand-hover); }
+    .text-right { text-align: right; }
+    .row-actions { text-align: right; white-space: nowrap; }
+    .btn-link { color: var(--brand); font-weight: 600; font-size: 0.83rem; text-decoration: none; }
+    .btn-link:hover { text-decoration: underline; }
+    .channel-badge { font-size: 0.75rem; font-weight: 650; padding: 0.2rem 0.55rem; border-radius: 999px; }
+    .channel-badge.npp { background: var(--brand-soft); color: var(--brand); }
+    .channel-badge.retail { background: var(--success-soft); color: var(--success); }
+</style>
+
+@code {
+    private List<Order>? orders;
+
+    protected override async Task OnInitializedAsync()
+    {
+        orders = await Api.GetOrdersAsync();
+    }
+}
