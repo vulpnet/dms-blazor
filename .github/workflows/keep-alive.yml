@@ -1,0 +1,14 @@
+name: Keep API alive
+
+on:
+  schedule:
+    # Render free tier ngủ sau ~15 phút không request — ping mỗi 10 phút để giữ thức.
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping /health
+        run: curl -fsS --max-time 30 https://dms-blazor.onrender.com/health
