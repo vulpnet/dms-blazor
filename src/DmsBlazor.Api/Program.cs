@@ -5,24 +5,12 @@ using Microsoft.EntityFrameworkCore;
 // dùng FileSystemWatcher/inotify để tự nạp lại appsettings.json khi file đổi, tính
 // năng này vô dụng trong container Production và có thể làm crash app trên host có
 // giới hạn inotify thấp (như Render free tier: "user limit (128) on inotify instances").
-var builder = WebApplication.CreateBuilder(new WebApplicationOptions
-{
-    Args = args,
-});
-builder.Configuration.Sources.Clear();
-builder.Configuration
-    .AddJsonFile("appsettings.json", optional: true, reloadOnChange: false)
-    .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: false);
-if (builder.Environment.IsDevelopment())
-{
-    // User Secrets (ConnectionStrings:DmsDb cho local dev) — CreateBuilder mặc định
-    // tự thêm nguồn này ở Development, nhưng Sources.Clear() ở trên đã xoá mất nên
-    // phải thêm lại thủ công.
-    builder.Configuration.AddUserSecrets<Program>();
-}
-builder.Configuration
-    .AddEnvironmentVariables()
-    .AddCommandLine(args);
+// PHẢI set qua biến môi trường TRƯỚC KHI gọi CreateBuilder — bản thân CreateBuilder
+// đã tự AddJsonFile với watcher bật sẵn trong constructor và ném exception ngay tại
+// đó; dọn dẹp Configuration.Sources sau khi builder đã tạo xong là quá muộn.
+Environment.SetEnvironmentVariable("DOTNET_hostBuilder:reloadConfigOnChange", "false");
+
+var builder = WebApplication.CreateBuilder(args);
 
 // Render.com cấp cổng lắng nghe qua biến môi trường PORT — nếu có thì phải bind
 // đúng cổng đó, nếu không container sẽ bị coi là "chưa sẵn sàng" và bị khởi động lại.
