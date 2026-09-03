@@ -43,6 +43,22 @@ trong Postgres:
 
 Sau khi đặt hàng thành công ở `/dat-hang`, tự động chuyển sang trang chi tiết đơn vừa tạo.
 
+### Chỉnh sửa đơn đã xác nhận
+
+Trang `/don-hang/{code}` có nút **✏️ Chỉnh sửa** và **Huỷ đơn** (ẩn nếu đơn đã huỷ):
+
+- **Sửa** — thêm/xoá dòng sản phẩm, đổi số lượng (KHÔNG đổi kênh/nhà phân phối của đơn), giá và
+  khuyến mãi tự tính lại từ đầu theo tổng mới. Mỗi lần lưu ghi 1 dòng vào **lịch sử chỉnh sửa**
+  (`OrderEditLog`) mô tả đúng thay đổi, vd `"Sửa SL Cola 330ml: 60 → 80; Thêm SP: Nước suối x20"`
+  — sinh tự động bằng cách so sánh dòng cũ/mới (`OrderEditDiffBuilder.cs`, có unit test riêng)
+- **Huỷ** — đổi `Status` sang `Cancelled`, KHÔNG xoá dữ liệu đơn. Đơn đã huỷ không sửa được nữa
+  (API trả `409 Conflict` nếu cố sửa)
+- Lịch sử chỉnh sửa hiện ở cuối trang chi tiết, mới nhất trước
+
+Sản phẩm đã ngừng bán (`IsActive = false`) vẫn sửa được trong đơn cũ nếu đơn đó đã có sẵn sản
+phẩm đó từ trước — màn hình sửa đọc `api/products` (danh sách quản lý, có cả hàng ngừng bán)
+thay vì `api/catalog/products` (chỉ hàng đang bán, dùng cho tạo đơn mới).
+
 **Logic tính giá/khuyến mãi** (`DmsBlazor.Shared/Services/OrderPricingService.cs`) port
 nguyên văn từ `pricing.ts` bên bản Next.js, verify lại bằng 5 unit test khớp đúng kết quả đã
 test ở bản gốc:

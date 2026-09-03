@@ -50,17 +50,7 @@ public class OrdersController(DmsDbContext db) : ControllerBase
             DiscountAmount = priced.DiscountAmount,
             Total = priced.Total,
             CreatedAt = DateTimeOffset.UtcNow,
-            Lines = priced.Lines.Select(l => new OrderLine
-            {
-                ProductCode = l.Product.Code,
-                ProductName = l.Product.Name,
-                Emoji = l.Product.Emoji,
-                Unit = request.Channel == SalesChannel.Npp ? $"thùng ({l.Product.CaseSize} {l.Product.Unit})" : l.Product.Unit,
-                Qty = l.Qty,
-                UnitPrice = l.UnitPrice,
-                LineTotal = l.LineTotal,
-                FreeUnits = l.FreeUnits
-            }).ToList()
+            Lines = ToOrderLines(priced, request.Channel)
         };
 
         db.Orders.Add(order);
@@ -77,7 +67,88 @@ public class OrdersController(DmsDbContext db) : ControllerBase
     [HttpGet("{code}")]
     public async Task<ActionResult<Order>> GetByCode(string code)
     {
-        var order = await db.Orders.Include(o => o.Lines).FirstOrDefaultAsync(o => o.OrderCode == code);
+        var order = await db.Orders
+            .Include(o => o.Lines)
+            .Include(o => o.EditLogs.OrderByDescending(l => l.CreatedAt))
+            .FirstOrDefaultAsync(o => o.OrderCode == code);
         return order is null ? NotFound() : order;
     }
+
+    // Sửa đơn đã xác nhận — thay TOÀN BỘ danh sách dòng, tính lại giá từ đầu theo
+    // đúng kênh/giá hiện tại của đơn (không đổi kênh/NPP). Ghi lại lịch sử thay đổi,
+    // không cho sửa đơn đã huỷ.
+    [HttpPut("{code}")]
+    public async Task<ActionResult<Order>> Update(string code, [FromBody] UpdateOrderRequest request)
+    {
+        var order = await db.Orders
+            .Include(o => o.Lines)
+            .FirstOrDefaultAsync(o => o.OrderCode == code);
+
+        if (order is null) return NotFound();
+        if (order.Status == OrderStatus.Cancelled)
+            return Conflict("Đơn hàng đã huỷ, không thể chỉnh sửa.");
+
+        var products = await db.Products.ToListAsync(); // cho sửa cả sản phẩm đã ngừng bán nếu đã có sẵn trong đơn cũ
+        var priced = OrderPricingService.Price(request.Lines, products, order.Channel);
+
+        if (priced.Lines.Count == 0)
+            return BadRequest("Đơn hàng phải có ít nhất 1 sản phẩm.");
+
+        var changes = OrderEditDiffBuilder.BuildChanges(order.Lines, priced.Lines);
+
+        db.OrderLines.RemoveRange(order.Lines);
+        order.Lines = ToOrderLines(priced, order.Channel);
+        order.TotalQty = priced.TotalQty;
+        order.Subtotal = priced.Subtotal;
+        order.DiscountPercent = priced.DiscountPercent;
+        order.DiscountAmount = priced.DiscountAmount;
+        order.Total = priced.Total;
+        order.UpdatedAt = DateTimeOffset.UtcNow;
+
+        if (changes.Count > 0)
+        {
+            db.OrderEditLogs.Add(new OrderEditLog
+            {
+                OrderId = order.Id,
+                Description = string.Join("; ", changes),
+                CreatedAt = order.UpdatedAt.Value
+            });
+        }
+
+        await db.SaveChangesAsync();
+        return await GetByCode(code);
+    }
+
+    [HttpPost("{code}/cancel")]
+    public async Task<IActionResult> Cancel(string code)
+    {
+        var order = await db.Orders.FirstOrDefaultAsync(o => o.OrderCode == code);
+        if (order is null) return NotFound();
+        if (order.Status == OrderStatus.Cancelled) return NoContent();
+
+        order.Status = OrderStatus.Cancelled;
+        order.UpdatedAt = DateTimeOffset.UtcNow;
+        db.OrderEditLogs.Add(new OrderEditLog
+        {
+            OrderId = order.Id,
+            Description = "Huỷ đơn hàng",
+            CreatedAt = order.UpdatedAt.Value
+        });
+
+        await db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    private static List<OrderLine> ToOrderLines(PricedOrder priced, SalesChannel channel) =>
+        priced.Lines.Select(l => new OrderLine
+        {
+            ProductCode = l.Product.Code,
+            ProductName = l.Product.Name,
+            Emoji = l.Product.Emoji,
+            Unit = channel == SalesChannel.Npp ? $"thùng ({l.Product.CaseSize} {l.Product.Unit})" : l.Product.Unit,
+            Qty = l.Qty,
+            UnitPrice = l.UnitPrice,
+            LineTotal = l.LineTotal,
+            FreeUnits = l.FreeUnits
+        }).ToList();
 }

@@ -46,11 +46,17 @@ public class OrderConfirmation
     public decimal Total { get; set; }
 }
 
+public enum OrderStatus
+{
+    Confirmed,
+    Cancelled
+}
+
 /// <summary>
 /// Đơn hàng đã lưu thật vào database — khác PricedOrder (chỉ là kết quả tính toán
 /// tạm thời, không lưu). Lines lưu SNAPSHOT tên/giá tại thời điểm đặt hàng, không
 /// tham chiếu trực tiếp Product — để đơn hàng cũ không bị đổi nếu sau này sửa/xoá
-/// sản phẩm gốc.
+/// sản phẩm gốc. Sửa đơn KHÔNG xoá lịch sử — mỗi lần sửa ghi 1 dòng vào EditLogs.
 /// </summary>
 public class Order
 {
@@ -58,13 +64,31 @@ public class Order
     public string OrderCode { get; set; } = "";      // vd DH-2026-0001, tăng dần theo năm
     public SalesChannel Channel { get; set; }
     public string? DistributorName { get; set; }      // snapshot tên NPP, null nếu kênh bán lẻ
+    public OrderStatus Status { get; set; } = OrderStatus.Confirmed;
     public int TotalQty { get; set; }
     public decimal Subtotal { get; set; }
     public decimal DiscountPercent { get; set; }
     public decimal DiscountAmount { get; set; }
     public decimal Total { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset? UpdatedAt { get; set; }
     public List<OrderLine> Lines { get; set; } = [];
+    public List<OrderEditLog> EditLogs { get; set; } = [];
+}
+
+/// <summary>Ghi lại mỗi lần sửa/hủy 1 đơn đã xác nhận — không cho sửa âm thầm chứng từ đã phát hành.</summary>
+public class OrderEditLog
+{
+    public int Id { get; set; }
+    public int OrderId { get; set; }
+    public string Description { get; set; } = "";   // vd "Sửa SL Cola 330ml: 60 → 80 thùng"
+    public DateTimeOffset CreatedAt { get; set; }
+}
+
+/// <summary>Yêu cầu cập nhật đơn hàng — thay toàn bộ danh sách dòng, tính lại giá từ đầu.</summary>
+public class UpdateOrderRequest
+{
+    public List<OrderLineInput> Lines { get; set; } = [];
 }
 
 public class OrderLine

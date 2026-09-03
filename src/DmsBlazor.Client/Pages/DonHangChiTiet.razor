@@ -17,98 +17,259 @@ else if (notFound)
 }
 else
 {
+    var isCancelled = order!.Status == OrderStatus.Cancelled;
+
     <div class="no-print">
         <div class="page-header page-header-row">
             <div>
-                <h1>Đơn hàng @order!.OrderCode</h1>
-                <p>Đặt lúc @order.CreatedAt.ToLocalTime().ToString("HH:mm dd/MM/yyyy")</p>
+                <h1>
+                    Đơn hàng @order.OrderCode
+                    @if (isCancelled)
+                    {
+                        <span class="status-badge cancelled">Đã huỷ</span>
+                    }
+                </h1>
+                <p>
+                    Đặt lúc @order.CreatedAt.ToLocalTime().ToString("HH:mm dd/MM/yyyy")
+                    @if (order.UpdatedAt.HasValue)
+                    {
+                        <span> · Sửa lần cuối @order.UpdatedAt.Value.ToLocalTime().ToString("HH:mm dd/MM/yyyy")</span>
+                    }
+                </p>
             </div>
             <div class="header-actions">
                 <a href="/don-hang" class="btn-outline">← Danh sách đơn</a>
-                <button class="btn-primary" @onclick="Print">🖨️ In phiếu</button>
+                @if (!isCancelled && !editing)
+                {
+                    <button class="btn-outline" @onclick="StartEdit">✏️ Chỉnh sửa</button>
+                    <button class="btn-outline danger" @onclick="() => showCancelConfirm = true">Huỷ đơn</button>
+                }
+                <button class="btn-primary" @onclick="Print" disabled="@editing">🖨️ In phiếu</button>
             </div>
         </div>
     </div>
 
-    <div class="print-area">
-        <div class="print-header">
-            <h2>PHIẾU ĐẶT HÀNG</h2>
-            <div class="print-meta">
-                <div><b>Mã đơn:</b> @order.OrderCode</div>
-                <div><b>Ngày đặt:</b> @order.CreatedAt.ToLocalTime().ToString("HH:mm dd/MM/yyyy")</div>
-                <div><b>Kênh:</b> @(order.Channel == SalesChannel.Npp ? "Nhà phân phối (bán sỉ)" : "Bán lẻ")</div>
-                @if (!string.IsNullOrEmpty(order.DistributorName))
-                {
-                    <div><b>Nhà phân phối:</b> @order.DistributorName</div>
-                }
+    @if (showCancelConfirm)
+    {
+        <div class="modal-backdrop no-print" @onclick="() => showCancelConfirm = false">
+            <div class="modal-panel" @onclick:stopPropagation="true">
+                <h3>Huỷ đơn hàng?</h3>
+                <p class="muted">Đơn <b>@order.OrderCode</b> sẽ được đánh dấu đã huỷ. Hành động này được ghi lại trong lịch sử, không xoá dữ liệu đơn.</p>
+                <div class="modal-actions">
+                    <button class="btn-outline" @onclick="() => showCancelConfirm = false">Đóng</button>
+                    <button class="btn-danger" @onclick="CancelOrder">Xác nhận huỷ</button>
+                </div>
             </div>
         </div>
+    }
 
-        <table class="data-table print-table">
-            <thead>
-                <tr>
-                    <th>Sản phẩm</th>
-                    <th>Đơn vị</th>
-                    <th class="text-right">SL</th>
-                    <th class="text-right">Đơn giá</th>
-                    <th class="text-right">Thành tiền</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var line in order.Lines)
-                {
-                    <tr>
-                        <td>@line.Emoji @line.ProductName</td>
-                        <td>@line.Unit</td>
-                        <td class="text-right">
-                            @line.Qty
-                            @if (line.FreeUnits > 0)
-                            {
-                                <span class="free-tag">+@line.FreeUnits tặng</span>
-                            }
-                        </td>
-                        <td class="text-right">@line.UnitPrice.ToString("N0")k</td>
-                        <td class="text-right">@line.LineTotal.ToString("N0")k</td>
-                    </tr>
-                }
-            </tbody>
-        </table>
+    @if (editing)
+    {
+        <div class="card no-print">
+            <h3>Chỉnh sửa đơn hàng</h3>
 
-        <div class="print-summary">
-            <div class="row"><span>Tổng số lượng</span><span>@order.TotalQty</span></div>
-            <div class="row"><span>Tạm tính</span><span>@order.Subtotal.ToString("N0")k</span></div>
-            @if (order.DiscountPercent > 0)
+            <div class="picker-row">
+                <div class="field field-grow">
+                    <label for="edit-product-select">Sản phẩm</label>
+                    <select id="edit-product-select" @bind="selectedProductId">
+                        @foreach (var p in editableProducts)
+                        {
+                            <option value="@p.Id">@p.Emoji @p.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="edit-qty-input">Số lượng</label>
+                    <input id="edit-qty-input" type="number" min="1" @bind="quantityToAdd" />
+                </div>
+                <button class="btn-primary" @onclick="AddToEditCart">+ Thêm vào đơn</button>
+            </div>
+
+            @if (editLines.Count > 0)
             {
-                <div class="row discount"><span>Chiết khấu @order.DiscountPercent%</span><span>-@order.DiscountAmount.ToString("N0")k</span></div>
+                <table class="data-table edit-table">
+                    <thead><tr><th>Sản phẩm</th><th class="text-right">Số lượng</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var line in editLines)
+                        {
+                            <tr>
+                                <td>@GetProductEmoji(line.ProductId) @GetProductName(line.ProductId)</td>
+                                <td class="text-right">
+                                    <input type="number" min="0" class="qty-inline"
+                                           value="@line.Qty"
+                                           @onchange="e => UpdateEditQty(line.ProductId, e.Value)" />
+                                </td>
+                                <td class="text-right">
+                                    <button class="btn-remove" aria-label="Xoá khỏi đơn" @onclick="() => RemoveEditLine(line.ProductId)">✕</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
             }
-            <div class="row total"><span>Tổng thanh toán</span><span>@order.Total.ToString("N0")k</span></div>
+            else
+            {
+                <p class="muted">Đơn hàng chưa có sản phẩm nào — thêm ít nhất 1 sản phẩm trước khi lưu.</p>
+            }
+
+            @if (editError is not null)
+            {
+                <div class="alert-error">@editError</div>
+            }
+
+            <div class="modal-actions">
+                <button class="btn-outline" @onclick="CancelEdit">Huỷ bỏ</button>
+                <button class="btn-primary" disabled="@(editLines.Count == 0 || saving)" @onclick="SaveEdit">
+                    @(saving ? "Đang lưu..." : "Lưu thay đổi")
+                </button>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="print-area">
+            <div class="print-header">
+                <h2>PHIẾU ĐẶT HÀNG</h2>
+                <div class="print-meta">
+                    <div><b>Mã đơn:</b> @order.OrderCode</div>
+                    <div><b>Ngày đặt:</b> @order.CreatedAt.ToLocalTime().ToString("HH:mm dd/MM/yyyy")</div>
+                    <div><b>Kênh:</b> @(order.Channel == SalesChannel.Npp ? "Nhà phân phối (bán sỉ)" : "Bán lẻ")</div>
+                    @if (!string.IsNullOrEmpty(order.DistributorName))
+                    {
+                        <div><b>Nhà phân phối:</b> @order.DistributorName</div>
+                    }
+                    @if (isCancelled)
+                    {
+                        <div class="cancelled-note">⚠️ Đơn hàng này đã bị huỷ</div>
+                    }
+                </div>
+            </div>
+
+            <table class="data-table print-table">
+                <thead>
+                    <tr>
+                        <th>Sản phẩm</th>
+                        <th>Đơn vị</th>
+                        <th class="text-right">SL</th>
+                        <th class="text-right">Đơn giá</th>
+                        <th class="text-right">Thành tiền</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var line in order.Lines)
+                    {
+                        <tr>
+                            <td>@line.Emoji @line.ProductName</td>
+                            <td>@line.Unit</td>
+                            <td class="text-right">
+                                @line.Qty
+                                @if (line.FreeUnits > 0)
+                                {
+                                    <span class="free-tag">+@line.FreeUnits tặng</span>
+                                }
+                            </td>
+                            <td class="text-right">@line.UnitPrice.ToString("N0")k</td>
+                            <td class="text-right">@line.LineTotal.ToString("N0")k</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+
+            <div class="print-summary">
+                <div class="row"><span>Tổng số lượng</span><span>@order.TotalQty</span></div>
+                <div class="row"><span>Tạm tính</span><span>@order.Subtotal.ToString("N0")k</span></div>
+                @if (order.DiscountPercent > 0)
+                {
+                    <div class="row discount"><span>Chiết khấu @order.DiscountPercent%</span><span>-@order.DiscountAmount.ToString("N0")k</span></div>
+                }
+                <div class="row total"><span>Tổng thanh toán</span><span>@order.Total.ToString("N0")k</span></div>
+            </div>
+
+            <div class="print-signature">
+                <div>
+                    <div class="sign-label">Người đặt hàng</div>
+                    <div class="sign-space"></div>
+                </div>
+                <div>
+                    <div class="sign-label">Xác nhận giao hàng</div>
+                    <div class="sign-space"></div>
+                </div>
+            </div>
         </div>
 
-        <div class="print-signature">
-            <div>
-                <div class="sign-label">Người đặt hàng</div>
-                <div class="sign-space"></div>
+        @if (order.EditLogs.Count > 0)
+        {
+            <div class="card no-print edit-history">
+                <h3>Lịch sử chỉnh sửa</h3>
+                <ul class="log-list">
+                    @foreach (var log in order.EditLogs)
+                    {
+                        <li>
+                            <span class="log-time">@log.CreatedAt.ToLocalTime().ToString("HH:mm dd/MM/yyyy")</span>
+                            <span>@log.Description</span>
+                        </li>
+                    }
+                </ul>
             </div>
-            <div>
-                <div class="sign-label">Xác nhận giao hàng</div>
-                <div class="sign-space"></div>
-            </div>
-        </div>
-    </div>
+        }
+    }
 }
 
 <style>
-    .header-actions { display: flex; gap: 0.6rem; align-items: center; }
+    .header-actions { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
     .btn-outline {
         border: 1px solid var(--line-strong); color: var(--ink); background: var(--surface);
         padding: 0.55rem 1rem; border-radius: 8px; font-weight: 600; font-size: 0.85rem; text-decoration: none;
-        display: inline-block;
+        display: inline-block; cursor: pointer;
     }
     .btn-outline:hover { border-color: var(--brand); text-decoration: none; }
+    .btn-outline.danger { color: var(--danger); }
+    .btn-outline.danger:hover { border-color: var(--danger); }
     .btn-primary {
         background: var(--brand); color: #fff; border: none; border-radius: 8px;
         padding: 0.6rem 1.2rem; font-weight: 600; cursor: pointer; font-size: 0.85rem;
     }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-danger {
+        background: var(--danger); color: #fff; border: none; border-radius: 8px;
+        padding: 0.6rem 1.2rem; font-weight: 600; cursor: pointer; font-size: 0.85rem;
+    }
+
+    .status-badge { font-size: 0.72rem; font-weight: 650; padding: 0.2rem 0.6rem; border-radius: 999px; margin-left: 0.6rem; vertical-align: middle; }
+    .status-badge.cancelled { background: var(--danger-soft); color: var(--danger); }
+    .cancelled-note { color: var(--danger); font-weight: 600; margin-top: 0.5rem; }
+
+    .modal-backdrop {
+        position: fixed; inset: 0; background: rgba(15,23,42,0.45);
+        display: flex; align-items: center; justify-content: center; padding: 1rem; z-index: 50;
+    }
+    .modal-panel {
+        background: var(--surface); border-radius: var(--radius); padding: 1.5rem;
+        width: 100%; max-width: 420px; box-shadow: var(--shadow-md);
+    }
+    .modal-panel h3 { font-size: 1.05rem; margin-bottom: 0.75rem; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 1.25rem; }
+
+    .picker-row { display: flex; align-items: flex-end; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
+    .field { margin: 0; }
+    .field-grow { flex: 1; min-width: 220px; }
+    .field label { display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 0.4rem; }
+    .field select, .field input, #edit-qty-input {
+        padding: 0.55rem 0.7rem; border: 1px solid var(--line-strong); border-radius: 8px; font-size: 0.88rem;
+    }
+    .field-grow select { width: 100%; }
+    #edit-qty-input { width: 90px; text-align: center; }
+
+    .edit-table { margin-bottom: 1rem; }
+    .qty-inline { width: 70px; text-align: center; padding: 0.35rem; border: 1px solid var(--line-strong); border-radius: 6px; }
+    .btn-remove { border: none; background: transparent; color: var(--muted); cursor: pointer; font-size: 0.85rem; }
+    .btn-remove:hover { color: var(--danger); }
+
+    .edit-history { margin-top: 1.25rem; }
+    .log-list { list-style: none; padding: 0; margin: 0; }
+    .log-list li { display: flex; gap: 0.75rem; padding: 0.55rem 0; border-bottom: 1px solid var(--line); font-size: 0.85rem; }
+    .log-list li:last-child { border-bottom: none; }
+    .log-time { color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 
     .print-area {
         background: var(--surface);
@@ -131,6 +292,7 @@ else
     .print-signature > div { width: 45%; }
     .sign-label { font-weight: 600; font-size: 0.85rem; margin-bottom: 3rem; }
     .sign-space { border-top: 1px dashed var(--line-strong); }
+    .muted { color: var(--muted); font-size: 0.85rem; }
 
     /* Khi in: ẩn nút bấm/header trang này. Ẩn sidebar + top-row của layout chung
        nằm ở app.css (áp dụng toàn site, không riêng trang này). */
@@ -145,11 +307,22 @@ else
 
     private Order? order;
     private bool notFound;
+    private bool showCancelConfirm;
+
+    // Chế độ sửa
+    private bool editing;
+    private bool saving;
+    private string? editError;
+    private List<Product> editableProducts = [];
+    private int selectedProductId;
+    private int quantityToAdd = 1;
+    private List<OrderLineInput> editLines = [];
 
     protected override async Task OnParametersSetAsync()
     {
         order = null;
         notFound = false;
+        editing = false;
         var result = await Api.GetOrderByCodeAsync(Code);
         if (result is null) notFound = true;
         else order = result;
@@ -158,5 +331,83 @@ else
     private async Task Print()
     {
         await JS.InvokeVoidAsync("print");
+    }
+
+    private async Task StartEdit()
+    {
+        editError = null;
+        // Cho sửa cả sản phẩm đã ngừng bán nếu đơn cũ đang có nó — dùng api/products
+        // (danh sách quản lý, có cả IsActive=false) thay vì api/catalog/products.
+        editableProducts = await Api.GetManagedProductsAsync() ?? [];
+        editLines = order!.Lines
+            .Select(l => new OrderLineInput
+            {
+                ProductId = editableProducts.FirstOrDefault(p => p.Code == l.ProductCode)?.Id ?? 0,
+                Qty = l.Qty
+            })
+            .Where(l => l.ProductId != 0)
+            .ToList();
+        selectedProductId = editableProducts.FirstOrDefault()?.Id ?? 0;
+        editing = true;
+    }
+
+    private void CancelEdit() => editing = false;
+
+    private void AddToEditCart()
+    {
+        if (selectedProductId == 0 || quantityToAdd <= 0) return;
+
+        var existing = editLines.FirstOrDefault(l => l.ProductId == selectedProductId);
+        if (existing is not null) existing.Qty += quantityToAdd;
+        else editLines.Add(new OrderLineInput { ProductId = selectedProductId, Qty = quantityToAdd });
+
+        quantityToAdd = 1;
+    }
+
+    private void UpdateEditQty(int productId, object? value)
+    {
+        if (!int.TryParse(value?.ToString(), out var qty)) return;
+        var line = editLines.FirstOrDefault(l => l.ProductId == productId);
+        if (line is null) return;
+
+        if (qty <= 0) editLines.Remove(line);
+        else line.Qty = qty;
+    }
+
+    private void RemoveEditLine(int productId) =>
+        editLines.RemoveAll(l => l.ProductId == productId);
+
+    private string GetProductName(int productId) =>
+        editableProducts.FirstOrDefault(p => p.Id == productId)?.Name ?? "(sản phẩm không xác định)";
+
+    private string GetProductEmoji(int productId) =>
+        editableProducts.FirstOrDefault(p => p.Id == productId)?.Emoji ?? "❓";
+
+    private async Task SaveEdit()
+    {
+        saving = true;
+        editError = null;
+
+        var (updated, error) = await Api.UpdateOrderAsync(Code, new UpdateOrderRequest { Lines = editLines });
+        saving = false;
+
+        if (updated is null)
+        {
+            editError = error ?? "Lưu thay đổi không thành công.";
+            return;
+        }
+
+        order = updated;
+        editing = false;
+    }
+
+    private async Task CancelOrder()
+    {
+        showCancelConfirm = false;
+        var success = await Api.CancelOrderAsync(Code);
+        if (success)
+        {
+            order = await Api.GetOrderByCodeAsync(Code);
+        }
     }
 }

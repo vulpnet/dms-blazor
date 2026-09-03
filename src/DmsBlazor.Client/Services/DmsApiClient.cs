@@ -35,6 +35,19 @@ public class DmsApiClient(HttpClient http)
     public Task<Order?> GetOrderByCodeAsync(string code) =>
         http.GetFromJsonAsync<Order>($"api/orders/{code}");
 
+    public async Task<(Order? Order, string? Error)> UpdateOrderAsync(string code, UpdateOrderRequest request)
+    {
+        var res = await http.PutAsJsonAsync($"api/orders/{code}", request);
+        if (!res.IsSuccessStatusCode) return (null, await res.Content.ReadAsStringAsync());
+        return (await res.Content.ReadFromJsonAsync<Order>(), null);
+    }
+
+    public async Task<bool> CancelOrderAsync(string code)
+    {
+        var res = await http.PostAsync($"api/orders/{code}/cancel", null);
+        return res.IsSuccessStatusCode;
+    }
+
     public Task<List<Shipment>?> GetShipmentsAsync(ShipmentStatus? status = null, string? region = null)
     {
         var query = new List<string>();

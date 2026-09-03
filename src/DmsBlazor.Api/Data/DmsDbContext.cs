@@ -10,6 +10,7 @@ public class DmsDbContext(DbContextOptions<DmsDbContext> options) : DbContext(op
     public DbSet<Shipment> Shipments => Set<Shipment>();
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderLine> OrderLines => Set<OrderLine>();
+    public DbSet<OrderEditLog> OrderEditLogs => Set<OrderEditLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -61,6 +62,7 @@ public class DmsDbContext(DbContextOptions<DmsDbContext> options) : DbContext(op
             e.Property(x => x.DiscountAmount).HasPrecision(14, 2);
             e.Property(x => x.Total).HasPrecision(14, 2);
             e.HasMany(x => x.Lines).WithOne().HasForeignKey(l => l.OrderId).OnDelete(DeleteBehavior.Cascade);
+            e.HasMany(x => x.EditLogs).WithOne().HasForeignKey(l => l.OrderId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<OrderLine>(e =>
@@ -71,6 +73,12 @@ public class DmsDbContext(DbContextOptions<DmsDbContext> options) : DbContext(op
             e.Property(x => x.Unit).HasMaxLength(30).IsRequired();
             e.Property(x => x.UnitPrice).HasPrecision(12, 2);
             e.Property(x => x.LineTotal).HasPrecision(14, 2);
+        });
+
+        modelBuilder.Entity<OrderEditLog>(e =>
+        {
+            e.ToTable("order_edit_logs");
+            e.Property(x => x.Description).HasMaxLength(500).IsRequired();
         });
     }
 }

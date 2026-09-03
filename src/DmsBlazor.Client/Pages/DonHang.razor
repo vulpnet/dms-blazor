@@ -37,13 +37,14 @@ else
                     <th>Nhà phân phối</th>
                     <th class="text-right">Số lượng</th>
                     <th class="text-right">Tổng tiền</th>
+                    <th>Trạng thái</th>
                     <th></th>
                 </tr>
             </thead>
             <tbody>
                 @foreach (var o in orders)
                 {
-                    <tr>
+                    <tr class="@(o.Status == OrderStatus.Cancelled ? "row-cancelled" : "")">
                         <td><code>@o.OrderCode</code></td>
                         <td>@o.CreatedAt.ToLocalTime().ToString("HH:mm dd/MM/yyyy")</td>
                         <td>
@@ -54,6 +55,16 @@ else
                         <td>@(o.DistributorName ?? "—")</td>
                         <td class="text-right">@o.TotalQty</td>
                         <td class="text-right">@o.Total.ToString("N0")k</td>
+                        <td>
+                            @if (o.Status == OrderStatus.Cancelled)
+                            {
+                                <span class="channel-badge cancelled">Đã huỷ</span>
+                            }
+                            else
+                            {
+                                <span class="channel-badge active">Hiệu lực</span>
+                            }
+                        </td>
                         <td class="row-actions">
                             <a href="/don-hang/@o.OrderCode" class="btn-link">Xem chi tiết</a>
                         </td>
@@ -79,6 +90,9 @@ else
     .channel-badge { font-size: 0.75rem; font-weight: 650; padding: 0.2rem 0.55rem; border-radius: 999px; }
     .channel-badge.npp { background: var(--brand-soft); color: var(--brand); }
     .channel-badge.retail { background: var(--success-soft); color: var(--success); }
+    .channel-badge.active { background: var(--success-soft); color: var(--success); }
+    .channel-badge.cancelled { background: var(--danger-soft); color: var(--danger); }
+    .row-cancelled { opacity: 0.55; }
 </style>
 
 @code {
