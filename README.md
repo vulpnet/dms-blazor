@@ -39,7 +39,21 @@ trong Postgres:
 - **`/don-hang`** — danh sách lịch sử đơn hàng, mới nhất trước
 - **`/don-hang/{code}`** — chi tiết 1 đơn + nút **In phiếu** (dùng `window.print()` của trình
   duyệt, CSS `@media print` ẩn sidebar/menu chỉ in đúng phần phiếu — không cần thư viện PDF
-  riêng)
+  riêng), kèm **mã vạch Code128** in ngay dưới tiêu đề phiếu (quét được bằng máy quét kho/giao
+  hàng thật, không phải hình minh hoạ)
+
+### Mã vạch Code128 — tự viết, không dùng thư viện ngoài
+
+`DmsBlazor.Shared/Services/Code128Encoder.cs` tự encode chuỗi thành pattern vạch (Code Set B —
+đủ chữ hoa/thường/số/dấu `-` cho mã đơn dạng `DH-2026-0001`), `Barcode.razor` vẽ lại bằng SVG.
+Không dùng thư viện JS/CDN ngoài, nhất quán với cách `BarChart.razor` tự vẽ biểu đồ.
+
+**Đã verify kỹ trước khi dùng** (đây là loại lỗi im lặng nguy hiểm — bảng tra sai sẽ ra hình
+vạch trông đúng nhưng máy quét đọc sai/không đọc được):
+- 5 unit test (`Code128EncoderTests.cs`) kiểm tra số module, checksum, ký tự Start/Stop
+- Trong quá trình viết, phát hiện và sửa 1 bug thật: nhầm "giá trị bit ('0'/'1')" thành "độ
+  rộng module" — sau khi sửa, đối chiếu độc lập cả 107 giá trị trong bảng tra với 1 bảng khác
+  sinh từ nguồn width-based riêng biệt (ISO/IEC 15417) — khớp 100%
 
 Sau khi đặt hàng thành công ở `/dat-hang`, tự động chuyển sang trang chi tiết đơn vừa tạo.
 

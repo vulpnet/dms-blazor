@@ -130,6 +130,9 @@ else
         <div class="print-area">
             <div class="print-header">
                 <h2>PHIẾU ĐẶT HÀNG</h2>
+                <div class="print-barcode">
+                    <Barcode Value="@order.OrderCode" Height="50" ModuleWidth="2" />
+                </div>
                 <div class="print-meta">
                     <div><b>Mã đơn:</b> @order.OrderCode</div>
                     <div><b>Ngày đặt:</b> @order.CreatedAt.ToLocalTime().ToString("HH:mm dd/MM/yyyy")</div>
@@ -280,6 +283,7 @@ else
     }
     .print-header { text-align: center; margin-bottom: 1.5rem; border-bottom: 2px solid var(--ink); padding-bottom: 1rem; }
     .print-header h2 { font-size: 1.3rem; letter-spacing: 0.05em; }
+    .print-barcode { margin: 0.9rem auto 0; max-width: 260px; }
     .print-meta { margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.88rem; }
     .print-table { margin-bottom: 1.25rem; }
     .text-right { text-align: right; }

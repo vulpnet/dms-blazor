@@ -1,0 +1,43 @@
+@* Mã vạch Code128 vẽ bằng SVG — dùng Code128Encoder (DmsBlazor.Shared) đã verify
+   đúng thuật toán chuẩn, không phụ thuộc thư viện JS ngoài. *@
+@using DmsBlazor.Shared.Services
+
+<div class="barcode-wrap">
+    @((MarkupString)BuildSvg())
+    <div class="barcode-text">@Value</div>
+</div>
+
+<style>
+    .barcode-wrap { text-align: center; }
+    .barcode-wrap svg { max-width: 100%; height: auto; }
+    .barcode-text { font-size: 0.8rem; letter-spacing: 0.08em; margin-top: 0.25rem; font-variant-numeric: tabular-nums; }
+</style>
+
+@code {
+    [Parameter, EditorRequired] public string Value { get; set; } = "";
+    [Parameter] public int Height { get; set; } = 60;
+    [Parameter] public int ModuleWidth { get; set; } = 2;
+
+    private string BuildSvg()
+    {
+        var bars = Code128Encoder.Encode(Value);
+        var totalModules = bars.Sum(b => b.Width);
+        var totalWidth = totalModules * ModuleWidth;
+
+        var sb = new System.Text.StringBuilder();
+        sb.Append($"<svg viewBox=\"0 0 {totalWidth} {Height}\" xmlns=\"http://www.w3.org/2000/svg\">");
+        sb.Append($"<rect x=\"0\" y=\"0\" width=\"{totalWidth}\" height=\"{Height}\" fill=\"white\" />");
+
+        int x = 0;
+        foreach (var (width, black) in bars)
+        {
+            var barWidth = width * ModuleWidth;
+            if (black)
+                sb.Append($"<rect x=\"{x}\" y=\"0\" width=\"{barWidth}\" height=\"{Height}\" fill=\"black\" />");
+            x += barWidth;
+        }
+
+        sb.Append("</svg>");
+        return sb.ToString();
+    }
+}
