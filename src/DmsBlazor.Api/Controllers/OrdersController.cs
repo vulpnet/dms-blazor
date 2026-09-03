@@ -15,7 +15,7 @@ public class OrdersController(DmsDbContext db) : ControllerBase
     [HttpPost("price")]
     public async Task<ActionResult<PricedOrder>> Price([FromBody] CreateOrderRequest request)
     {
-        var products = await db.Products.ToListAsync();
+        var products = await db.Products.Where(p => p.IsActive).ToListAsync();
         var priced = OrderPricingService.Price(request.Lines, products, request.Channel);
         return priced;
     }
@@ -24,7 +24,7 @@ public class OrdersController(DmsDbContext db) : ControllerBase
     [HttpPost("confirm")]
     public async Task<ActionResult<OrderConfirmation>> Confirm([FromBody] CreateOrderRequest request)
     {
-        var products = await db.Products.ToListAsync();
+        var products = await db.Products.Where(p => p.IsActive).ToListAsync();
         var priced = OrderPricingService.Price(request.Lines, products, request.Channel);
         var code = $"DH{Random.Shared.Next(100000, 999999)}";
         return new OrderConfirmation { OrderCode = code, Total = priced.Total };

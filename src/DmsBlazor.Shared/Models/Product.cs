@@ -11,4 +11,5 @@ public class Product
     public decimal PricePerCase { get; set; }     // giá 1 thùng (kênh NPP) — nghìn đồng
     public decimal PricePerUnit { get; set; }     // giá 1 đơn vị lẻ (kênh bán lẻ) — nghìn đồng
     public string Emoji { get; set; } = "";
+    public bool IsActive { get; set; } = true;    // đang bán — chỉ sản phẩm này mới hiện ở màn hình đặt hàng
 }

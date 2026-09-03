@@ -43,19 +43,26 @@ else
                     <th>Danh mục</th>
                     <th>Giá thùng</th>
                     <th>Giá lẻ</th>
+                    <th>Đang bán</th>
                     <th></th>
                 </tr>
             </thead>
             <tbody>
                 @foreach (var p in products)
                 {
-                    <tr>
+                    <tr class="@(p.IsActive ? "" : "row-inactive")">
                         <td>@p.Emoji</td>
                         <td><code>@p.Code</code></td>
                         <td>@p.Name</td>
                         <td>@p.Category</td>
                         <td>@p.PricePerCase.ToString("N0")k / @p.CaseSize @p.Unit</td>
                         <td>@p.PricePerUnit.ToString("N0")k / @p.Unit</td>
+                        <td>
+                            <label class="toggle">
+                                <input type="checkbox" checked="@p.IsActive" @onchange="e => ToggleActive(p, (bool)e.Value!)" />
+                                <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                            </label>
+                        </td>
                         <td class="row-actions">
                             <button class="btn-link" @onclick="() => OpenEditForm(p)">Sửa</button>
                             <button class="btn-link danger" @onclick="() => ConfirmDelete(p)">Xoá</button>
@@ -113,6 +120,13 @@ else
                         <label for="f-priceunit">Giá 1 đơn vị lẻ (nghìn đ)</label>
                         <InputNumber id="f-priceunit" @bind-Value="formModel.PricePerUnit" />
                     </div>
+                </div>
+
+                <div class="field field-checkbox">
+                    <label>
+                        <InputCheckbox @bind-Value="formModel.IsActive" />
+                        Đang bán (hiện ở màn hình đặt hàng)
+                    </label>
                 </div>
 
                 @if (formError is not null)
@@ -200,6 +214,21 @@ else
         font-size: 0.88rem;
         margin-top: 0.35rem;
     }
+    /* Checkbox "Đang bán" không cần width/border như input text — ghi đè lại */
+    .field-checkbox label {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.88rem;
+        font-weight: 500;
+        color: var(--ink);
+        cursor: pointer;
+    }
+    .field-checkbox input {
+        width: auto !important;
+        margin-top: 0 !important;
+        accent-color: var(--brand);
+    }
 </style>
 
 @code {
@@ -251,7 +280,8 @@ else
             CaseSize = p.CaseSize,
             PricePerCase = p.PricePerCase,
             PricePerUnit = p.PricePerUnit,
-            Emoji = p.Emoji
+            Emoji = p.Emoji,
+            IsActive = p.IsActive
         };
         formError = null;
         showForm = true;
@@ -273,7 +303,8 @@ else
             CaseSize = formModel.CaseSize,
             PricePerCase = formModel.PricePerCase,
             PricePerUnit = formModel.PricePerUnit,
-            Emoji = string.IsNullOrWhiteSpace(formModel.Emoji) ? "📦" : formModel.Emoji.Trim()
+            Emoji = string.IsNullOrWhiteSpace(formModel.Emoji) ? "📦" : formModel.Emoji.Trim(),
+            IsActive = formModel.IsActive
         };
 
         var (success, error) = editingId is null
@@ -290,6 +321,27 @@ else
 
         showForm = false;
         await LoadProducts();
+    }
+
+    private async Task ToggleActive(Product p, bool isActive)
+    {
+        // Cập nhật lạc quan trên UI trước, gọi API ngay sau — nếu lỗi thì tải lại
+        // danh sách để đưa trạng thái công tắc về đúng thực tế trên server.
+        p.IsActive = isActive;
+        var updated = new Product
+        {
+            Code = p.Code,
+            Name = p.Name,
+            Category = p.Category,
+            Unit = p.Unit,
+            CaseSize = p.CaseSize,
+            PricePerCase = p.PricePerCase,
+            PricePerUnit = p.PricePerUnit,
+            Emoji = p.Emoji,
+            IsActive = isActive
+        };
+        var (success, _) = await Api.UpdateProductAsync(p.Id, updated);
+        if (!success) await LoadProducts();
     }
 
     private void ConfirmDelete(Product p) => confirmingDelete = p;
@@ -328,5 +380,7 @@ else
         public decimal PricePerUnit { get; set; }
 
         public string Emoji { get; set; } = "📦";
+
+        public bool IsActive { get; set; } = true;
     }
 }

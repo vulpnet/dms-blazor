@@ -28,6 +28,7 @@ public class DmsDbContext(DbContextOptions<DmsDbContext> options) : DbContext(op
             e.Property(x => x.Unit).HasMaxLength(30).IsRequired();
             e.Property(x => x.PricePerCase).HasPrecision(12, 2);
             e.Property(x => x.PricePerUnit).HasPrecision(12, 2);
+            e.Property(x => x.IsActive).HasDefaultValue(true);
         });
 
         modelBuilder.Entity<Shipment>(e =>

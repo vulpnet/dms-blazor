@@ -50,6 +50,7 @@ public class ProductsController(DmsDbContext db) : ControllerBase
         product.PricePerCase = input.PricePerCase;
         product.PricePerUnit = input.PricePerUnit;
         product.Emoji = input.Emoji;
+        product.IsActive = input.IsActive;
 
         await db.SaveChangesAsync();
         return NoContent();
