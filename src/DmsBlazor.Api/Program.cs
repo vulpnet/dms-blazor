@@ -49,14 +49,4 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-// Endpoint chẩn đoán tạm thời — kiểm tra CORS không nhận đúng origin trên Render,
-// dùng để xem server thực sự đọc được EnvironmentName và AllowedOrigins là gì.
-// XOÁ sau khi xác định xong nguyên nhân.
-app.MapGet("/api/_debug/config", () => new
-{
-    EnvironmentName = app.Environment.EnvironmentName,
-    AllowedOrigins = allowedOrigins,
-    Port = renderPort
-});
-
 app.Run();
