@@ -143,7 +143,7 @@ else
                     }
                     @if (isCancelled)
                     {
-                        <div class="cancelled-note">⚠️ Đơn hàng này đã bị huỷ</div>
+                        <div class="cancelled-note">Đơn hàng này đã bị huỷ</div>
                     }
                 </div>
             </div>
@@ -162,7 +162,7 @@ else
                     @foreach (var line in order.Lines)
                     {
                         <tr>
-                            <td>@line.Emoji @line.ProductName</td>
+                            <td><span class="no-print-inline">@line.Emoji</span> @line.ProductName</td>
                             <td>@line.Unit</td>
                             <td class="text-right">
                                 @line.Qty
@@ -307,7 +307,7 @@ else
             margin: 8mm;
         }
 
-        .no-print { display: none !important; }
+        .no-print, .no-print-inline { display: none !important; }
 
         html, body { width: 148mm; }
 
