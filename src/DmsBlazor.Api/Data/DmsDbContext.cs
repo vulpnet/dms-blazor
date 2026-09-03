@@ -69,6 +69,10 @@ public class DmsDbContext(DbContextOptions<DmsDbContext> options) : DbContext(op
             e.Property(x => x.DiscountAmount).HasPrecision(14, 2);
             e.Property(x => x.Total).HasPrecision(14, 2);
             e.Property(x => x.DeliveryFailureReason).HasMaxLength(500);
+            // Snapshot chuyến giao — API tự nạp qua join khi trả về, không lưu cột riêng.
+            e.Ignore(x => x.DeliveryTripCode);
+            e.Ignore(x => x.DeliveryDriverName);
+            e.Ignore(x => x.DeliveryVehiclePlate);
             e.HasMany(x => x.Lines).WithOne().HasForeignKey(l => l.OrderId).OnDelete(DeleteBehavior.Cascade);
             e.HasMany(x => x.EditLogs).WithOne().HasForeignKey(l => l.OrderId).OnDelete(DeleteBehavior.Cascade);
         });

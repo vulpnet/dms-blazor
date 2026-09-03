@@ -19,7 +19,18 @@ public class DeliveryTripsController(DmsDbContext db) : ControllerBase
         var trip = await db.DeliveryTrips
             .Include(t => t.Orders).ThenInclude(o => o.Lines)
             .FirstOrDefaultAsync(t => t.TripCode == code);
-        return trip is null ? NotFound() : trip;
+        if (trip is null) return NotFound();
+
+        // Nạp snapshot chuyến/tài xế cho từng đơn — dùng khi render phiếu in
+        // (PhieuGiaoHang.razor) mà không cần đơn tự query lại thông tin chuyến.
+        foreach (var order in trip.Orders)
+        {
+            order.DeliveryTripCode = trip.TripCode;
+            order.DeliveryDriverName = trip.DriverName;
+            order.DeliveryVehiclePlate = trip.VehiclePlate;
+        }
+
+        return trip;
     }
 
     // Đơn hàng còn chờ gom chuyến — Confirmed và chưa gán chuyến nào (Pending).

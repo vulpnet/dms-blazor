@@ -81,6 +81,13 @@ public class Order
     public int? DeliveryTripId { get; set; }
     public DateTimeOffset? DeliveredAt { get; set; }
     public string? DeliveryFailureReason { get; set; }
+
+    // Snapshot thông tin chuyến giao — KHÔNG lưu cột riêng trong bảng orders (NotMapped
+    // ở DbContext), API tự nạp qua join khi trả về để trang đơn hàng/phiếu in hiển thị
+    // mà không cần gọi thêm API chuyến giao.
+    public string? DeliveryTripCode { get; set; }
+    public string? DeliveryDriverName { get; set; }
+    public string? DeliveryVehiclePlate { get; set; }
 }
 
 /// <summary>Ghi lại mỗi lần sửa/hủy 1 đơn đã xác nhận — không cho sửa âm thầm chứng từ đã phát hành.</summary>

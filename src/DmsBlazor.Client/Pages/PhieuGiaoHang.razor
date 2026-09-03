@@ -1,0 +1,152 @@
+@* Nội dung 1 phiếu đặt hàng — dùng chung cho trang chi tiết đơn (in lẻ) và trang
+   in hàng loạt theo chuyến giao (nhiều phiếu, mỗi phiếu ngắt trang riêng). *@
+@using DmsBlazor.Shared.Models
+
+<div class="print-area">
+    <div class="print-header">
+        <h2>PHIẾU ĐẶT HÀNG</h2>
+        <div class="print-barcode">
+            <Barcode Value="@Order.OrderCode" Height="50" ModuleWidth="2" />
+        </div>
+        <div class="print-meta">
+            <div><b>Mã đơn:</b> @Order.OrderCode</div>
+            <div><b>Ngày đặt:</b> @Order.CreatedAt.ToLocalTime().ToString("HH:mm dd/MM/yyyy")</div>
+            <div><b>Kênh:</b> @(Order.Channel == SalesChannel.Npp ? "Nhà phân phối (bán sỉ)" : "Bán lẻ")</div>
+            @if (!string.IsNullOrEmpty(Order.DistributorName))
+            {
+                <div><b>Nhà phân phối:</b> @Order.DistributorName</div>
+            }
+            @if (!string.IsNullOrEmpty(Order.DeliveryTripCode))
+            {
+                <div><b>Chuyến giao:</b> @Order.DeliveryTripCode</div>
+                <div><b>Tài xế:</b> @Order.DeliveryDriverName — @Order.DeliveryVehiclePlate</div>
+            }
+            @if (Order.DeliveryStatus == OrderDeliveryStatus.Delivered && Order.DeliveredAt.HasValue)
+            {
+                <div><b>Đã giao lúc:</b> @Order.DeliveredAt.Value.ToLocalTime().ToString("HH:mm dd/MM/yyyy")</div>
+            }
+            @if (Order.Status == OrderStatus.Cancelled)
+            {
+                <div class="cancelled-note">Đơn hàng này đã bị huỷ</div>
+            }
+        </div>
+    </div>
+
+    <table class="data-table print-table">
+        <thead>
+            <tr>
+                <th>Sản phẩm</th>
+                <th>Đơn vị</th>
+                <th class="text-right">SL</th>
+                <th class="text-right">Đơn giá</th>
+                <th class="text-right">Thành tiền</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var line in Order.Lines)
+            {
+                <tr>
+                    <td><span class="no-print-inline">@line.Emoji</span> @line.ProductName</td>
+                    <td>@line.Unit</td>
+                    <td class="text-right">
+                        @line.Qty
+                        @if (line.FreeUnits > 0)
+                        {
+                            <span class="free-tag">+@line.FreeUnits tặng</span>
+                        }
+                    </td>
+                    <td class="text-right">@line.UnitPrice.ToString("N0")k</td>
+                    <td class="text-right">@line.LineTotal.ToString("N0")k</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <div class="print-summary">
+        <div class="row"><span>Tổng số lượng</span><span>@Order.TotalQty</span></div>
+        <div class="row"><span>Tạm tính</span><span>@Order.Subtotal.ToString("N0")k</span></div>
+        @if (Order.DiscountPercent > 0)
+        {
+            <div class="row discount"><span>Chiết khấu @Order.DiscountPercent%</span><span>-@Order.DiscountAmount.ToString("N0")k</span></div>
+        }
+        <div class="row total"><span>Tổng thanh toán</span><span>@Order.Total.ToString("N0")k</span></div>
+    </div>
+
+    <div class="print-signature">
+        <div>
+            <div class="sign-label">Người đặt hàng</div>
+            <div class="sign-space"></div>
+        </div>
+        <div>
+            <div class="sign-label">Xác nhận giao hàng</div>
+            <div class="sign-space"></div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .print-area {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 2rem;
+        max-width: 720px;
+    }
+    .print-header { text-align: center; margin-bottom: 1.5rem; border-bottom: 2px solid var(--ink); padding-bottom: 1rem; }
+    .print-header h2 { font-size: 1.3rem; letter-spacing: 0.05em; }
+    .print-barcode { margin: 0.9rem auto 0; max-width: 260px; }
+    .print-meta { margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.88rem; }
+    .print-table { margin-bottom: 1.25rem; }
+    .text-right { text-align: right; }
+    .free-tag { display: block; font-size: 0.72rem; color: var(--success); }
+    .print-summary { max-width: 320px; margin-left: auto; font-size: 0.9rem; }
+    .print-summary .row { display: flex; justify-content: space-between; margin-bottom: 0.4rem; }
+    .print-summary .discount { color: var(--success); }
+    .print-summary .total { font-weight: 700; font-size: 1.05rem; border-top: 1px solid var(--line); padding-top: 0.5rem; margin-top: 0.3rem; }
+    .print-signature { display: flex; justify-content: space-between; margin-top: 3rem; text-align: center; }
+    .print-signature > div { width: 45%; }
+    .sign-label { font-weight: 600; font-size: 0.85rem; margin-bottom: 3rem; }
+    .sign-space { border-top: 1px dashed var(--line-strong); }
+    .cancelled-note { color: var(--danger); font-weight: 600; margin-top: 0.5rem; }
+
+    /* Ép khổ A5 khi in để không phụ thuộc khổ mặc định của máy in (thường A4)
+       gây tràn lề 2 bên. Mỗi phiếu ngắt trang riêng khi in hàng loạt nhiều phiếu
+       (page-break-after) — trang cuối không cần ngắt thêm trang trắng phía sau. */
+    @@media print {
+        @@page {
+            size: A5;
+            margin: 8mm;
+        }
+
+        .no-print-inline { display: none !important; }
+
+        .print-area {
+            border: none;
+            padding: 0 6mm;
+            max-width: 100%;
+            width: 100%;
+            font-size: 0.78rem;
+            box-sizing: border-box;
+            page-break-after: always;
+        }
+        .print-area:last-child { page-break-after: auto; }
+
+        .print-header { margin-bottom: 0.75rem; padding-bottom: 0.5rem; }
+        .print-header h2 { font-size: 1.05rem; }
+        .print-barcode { max-width: 190px; }
+        .print-meta { font-size: 0.75rem; gap: 0.15rem; }
+
+        .print-table { width: 92%; margin-left: auto; margin-right: auto; }
+        .print-table th, .print-table td { padding: 0.25rem 0.35rem; font-size: 0.7rem; }
+
+        .print-summary { width: 60%; max-width: 60%; font-size: 0.78rem; }
+        .print-summary .total { font-size: 0.9rem; }
+
+        .print-signature { margin-top: 1.5rem; }
+        .sign-label { margin-bottom: 1.75rem; font-size: 0.74rem; }
+    }
+</style>
+
+@code {
+    [Parameter, EditorRequired] public Order Order { get; set; } = null!;
+}

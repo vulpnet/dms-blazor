@@ -61,8 +61,12 @@ public class OrdersController(DmsDbContext db) : ControllerBase
 
     // Lịch sử đơn hàng — mới nhất trước
     [HttpGet]
-    public async Task<ActionResult<List<Order>>> GetAll() =>
-        await db.Orders.Include(o => o.Lines).OrderByDescending(o => o.CreatedAt).ToListAsync();
+    public async Task<ActionResult<List<Order>>> GetAll()
+    {
+        var orders = await db.Orders.Include(o => o.Lines).OrderByDescending(o => o.CreatedAt).ToListAsync();
+        await AttachTripInfoAsync(orders);
+        return orders;
+    }
 
     [HttpGet("{code}")]
     public async Task<ActionResult<Order>> GetByCode(string code)
@@ -71,7 +75,32 @@ public class OrdersController(DmsDbContext db) : ControllerBase
             .Include(o => o.Lines)
             .Include(o => o.EditLogs.OrderByDescending(l => l.CreatedAt))
             .FirstOrDefaultAsync(o => o.OrderCode == code);
-        return order is null ? NotFound() : order;
+        if (order is null) return NotFound();
+
+        await AttachTripInfoAsync([order]);
+        return order;
+    }
+
+    // Nạp snapshot mã chuyến/tài xế/xe cho các đơn đã gán chuyến giao — 1 query duy
+    // nhất bất kể danh sách bao nhiêu đơn, tránh N+1.
+    private async Task AttachTripInfoAsync(List<Order> orders)
+    {
+        var tripIds = orders.Where(o => o.DeliveryTripId.HasValue).Select(o => o.DeliveryTripId!.Value).Distinct().ToList();
+        if (tripIds.Count == 0) return;
+
+        var trips = await db.DeliveryTrips
+            .Where(t => tripIds.Contains(t.Id))
+            .Select(t => new { t.Id, t.TripCode, t.DriverName, t.VehiclePlate })
+            .ToListAsync();
+
+        foreach (var order in orders)
+        {
+            var trip = trips.FirstOrDefault(t => t.Id == order.DeliveryTripId);
+            if (trip is null) continue;
+            order.DeliveryTripCode = trip.TripCode;
+            order.DeliveryDriverName = trip.DriverName;
+            order.DeliveryVehiclePlate = trip.VehiclePlate;
+        }
     }
 
     // Sửa đơn đã xác nhận — thay TOÀN BỘ danh sách dòng, tính lại giá từ đầu theo

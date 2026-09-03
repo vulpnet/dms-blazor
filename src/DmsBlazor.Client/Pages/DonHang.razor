@@ -38,6 +38,7 @@ else
                     <th class="text-right">Số lượng</th>
                     <th class="text-right">Tổng tiền</th>
                     <th>Trạng thái</th>
+                    <th>Vận chuyển</th>
                     <th></th>
                 </tr>
             </thead>
@@ -63,6 +64,13 @@ else
                             else
                             {
                                 <span class="channel-badge active">Hiệu lực</span>
+                            }
+                        </td>
+                        <td>
+                            <span class="channel-badge @DeliveryBadgeClass(o.DeliveryStatus)">@DeliveryStatusLabel(o.DeliveryStatus)</span>
+                            @if (!string.IsNullOrEmpty(o.DeliveryTripCode))
+                            {
+                                <div class="muted"><a href="/van-chuyen/@o.DeliveryTripCode">@o.DeliveryTripCode</a></div>
                             }
                         </td>
                         <td class="row-actions">
@@ -92,7 +100,13 @@ else
     .channel-badge.retail { background: var(--success-soft); color: var(--success); }
     .channel-badge.active { background: var(--success-soft); color: var(--success); }
     .channel-badge.cancelled { background: var(--danger-soft); color: var(--danger); }
+    .channel-badge.pending { background: #eef1f5; color: #475569; }
+    .channel-badge.intrip { background: var(--brand-soft); color: var(--brand); }
+    .channel-badge.delivered { background: var(--success-soft); color: var(--success); }
+    .channel-badge.failed { background: var(--danger-soft); color: var(--danger); }
     .row-cancelled { opacity: 0.55; }
+    .muted { color: var(--muted); font-size: 0.75rem; margin-top: 0.2rem; }
+    .muted a { color: inherit; }
 </style>
 
 @code {
@@ -102,4 +116,22 @@ else
     {
         orders = await Api.GetOrdersAsync();
     }
+
+    private static string DeliveryStatusLabel(OrderDeliveryStatus s) => s switch
+    {
+        OrderDeliveryStatus.Pending => "Chờ giao",
+        OrderDeliveryStatus.InTrip => "Đang giao",
+        OrderDeliveryStatus.Delivered => "Đã giao",
+        OrderDeliveryStatus.Failed => "Giao thất bại",
+        _ => s.ToString()
+    };
+
+    private static string DeliveryBadgeClass(OrderDeliveryStatus s) => s switch
+    {
+        OrderDeliveryStatus.Pending => "pending",
+        OrderDeliveryStatus.InTrip => "intrip",
+        OrderDeliveryStatus.Delivered => "delivered",
+        OrderDeliveryStatus.Failed => "failed",
+        _ => ""
+    };
 }

@@ -23,6 +23,7 @@ else
         </div>
         <div class="header-actions">
             <a href="/van-chuyen" class="btn-outline">← Danh sách chuyến</a>
+            <a href="/van-chuyen/@Code/in" class="btn-outline">🖨️ In tất cả phiếu</a>
             @if (trip.Status == TripStatus.Planning)
             {
                 <button class="btn-primary" @onclick="Depart">🚚 Bắt đầu giao</button>

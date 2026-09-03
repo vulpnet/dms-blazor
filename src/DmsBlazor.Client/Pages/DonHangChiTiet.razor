@@ -127,78 +127,7 @@ else
     }
     else
     {
-        <div class="print-area">
-            <div class="print-header">
-                <h2>PHIẾU ĐẶT HÀNG</h2>
-                <div class="print-barcode">
-                    <Barcode Value="@order.OrderCode" Height="50" ModuleWidth="2" />
-                </div>
-                <div class="print-meta">
-                    <div><b>Mã đơn:</b> @order.OrderCode</div>
-                    <div><b>Ngày đặt:</b> @order.CreatedAt.ToLocalTime().ToString("HH:mm dd/MM/yyyy")</div>
-                    <div><b>Kênh:</b> @(order.Channel == SalesChannel.Npp ? "Nhà phân phối (bán sỉ)" : "Bán lẻ")</div>
-                    @if (!string.IsNullOrEmpty(order.DistributorName))
-                    {
-                        <div><b>Nhà phân phối:</b> @order.DistributorName</div>
-                    }
-                    @if (isCancelled)
-                    {
-                        <div class="cancelled-note">Đơn hàng này đã bị huỷ</div>
-                    }
-                </div>
-            </div>
-
-            <table class="data-table print-table">
-                <thead>
-                    <tr>
-                        <th>Sản phẩm</th>
-                        <th>Đơn vị</th>
-                        <th class="text-right">SL</th>
-                        <th class="text-right">Đơn giá</th>
-                        <th class="text-right">Thành tiền</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var line in order.Lines)
-                    {
-                        <tr>
-                            <td><span class="no-print-inline">@line.Emoji</span> @line.ProductName</td>
-                            <td>@line.Unit</td>
-                            <td class="text-right">
-                                @line.Qty
-                                @if (line.FreeUnits > 0)
-                                {
-                                    <span class="free-tag">+@line.FreeUnits tặng</span>
-                                }
-                            </td>
-                            <td class="text-right">@line.UnitPrice.ToString("N0")k</td>
-                            <td class="text-right">@line.LineTotal.ToString("N0")k</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-
-            <div class="print-summary">
-                <div class="row"><span>Tổng số lượng</span><span>@order.TotalQty</span></div>
-                <div class="row"><span>Tạm tính</span><span>@order.Subtotal.ToString("N0")k</span></div>
-                @if (order.DiscountPercent > 0)
-                {
-                    <div class="row discount"><span>Chiết khấu @order.DiscountPercent%</span><span>-@order.DiscountAmount.ToString("N0")k</span></div>
-                }
-                <div class="row total"><span>Tổng thanh toán</span><span>@order.Total.ToString("N0")k</span></div>
-            </div>
-
-            <div class="print-signature">
-                <div>
-                    <div class="sign-label">Người đặt hàng</div>
-                    <div class="sign-space"></div>
-                </div>
-                <div>
-                    <div class="sign-label">Xác nhận giao hàng</div>
-                    <div class="sign-space"></div>
-                </div>
-            </div>
-        </div>
+        <PhieuGiaoHang Order="order" />
 
         @if (order.EditLogs.Count > 0)
         {
@@ -274,65 +203,14 @@ else
     .log-list li:last-child { border-bottom: none; }
     .log-time { color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 
-    .print-area {
-        background: var(--surface);
-        border: 1px solid var(--line);
-        border-radius: var(--radius);
-        padding: 2rem;
-        max-width: 720px;
-    }
-    .print-header { text-align: center; margin-bottom: 1.5rem; border-bottom: 2px solid var(--ink); padding-bottom: 1rem; }
-    .print-header h2 { font-size: 1.3rem; letter-spacing: 0.05em; }
-    .print-barcode { margin: 0.9rem auto 0; max-width: 260px; }
-    .print-meta { margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.88rem; }
-    .print-table { margin-bottom: 1.25rem; }
-    .text-right { text-align: right; }
-    .free-tag { display: block; font-size: 0.72rem; color: var(--success); }
-    .print-summary { max-width: 320px; margin-left: auto; font-size: 0.9rem; }
-    .print-summary .row { display: flex; justify-content: space-between; margin-bottom: 0.4rem; }
-    .print-summary .discount { color: var(--success); }
-    .print-summary .total { font-weight: 700; font-size: 1.05rem; border-top: 1px solid var(--line); padding-top: 0.5rem; margin-top: 0.3rem; }
-    .print-signature { display: flex; justify-content: space-between; margin-top: 3rem; text-align: center; }
-    .print-signature > div { width: 45%; }
-    .sign-label { font-weight: 600; font-size: 0.85rem; margin-bottom: 3rem; }
-    .sign-space { border-top: 1px dashed var(--line-strong); }
     .muted { color: var(--muted); font-size: 0.85rem; }
 
     /* Khi in: ẩn nút bấm/header trang này. Ẩn sidebar + top-row của layout chung
-       nằm ở app.css (áp dụng toàn site, không riêng trang này). Ép khổ A5 để
-       không phụ thuộc khổ mặc định của máy in (thường A4) gây tràn lề 2 bên. */
+       nằm ở app.css (áp dụng toàn site, không riêng trang này). CSS riêng cho phần
+       phiếu (.print-area, khổ A5...) nằm trong PhieuGiaoHang.razor. */
     @@media print {
-        @@page {
-            size: A5;
-            margin: 8mm;
-        }
-
-        .no-print, .no-print-inline { display: none !important; }
-
+        .no-print { display: none !important; }
         html, body { width: 148mm; }
-
-        .print-area {
-            border: none;
-            padding: 0 6mm;
-            max-width: 100%;
-            width: 100%;
-            font-size: 0.78rem;
-            box-sizing: border-box;
-        }
-
-        .print-header { margin-bottom: 0.75rem; padding-bottom: 0.5rem; }
-        .print-header h2 { font-size: 1.05rem; }
-        .print-barcode { max-width: 190px; }
-        .print-meta { font-size: 0.75rem; gap: 0.15rem; }
-
-        .print-table { width: 92%; margin-left: auto; margin-right: auto; }
-        .print-table th, .print-table td { padding: 0.25rem 0.35rem; font-size: 0.7rem; }
-
-        .print-summary { width: 60%; max-width: 60%; font-size: 0.78rem; }
-        .print-summary .total { font-size: 0.9rem; }
-
-        .print-signature { margin-top: 1.5rem; }
-        .sign-label { margin-bottom: 1.75rem; font-size: 0.74rem; }
     }
 </style>
 

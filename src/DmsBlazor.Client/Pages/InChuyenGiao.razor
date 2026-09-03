@@ -1,0 +1,73 @@
+@page "/van-chuyen/{Code}/in"
+@using DmsBlazor.Shared.Models
+@using DmsBlazor.Client.Services
+@inject DmsApiClient Api
+@inject IJSRuntime JS
+
+<PageTitle>In phiếu chuyến @Code — DMS</PageTitle>
+
+@if (trip is null && !notFound)
+{
+    <div class="skeleton-row no-print"><div class="skeleton-card"></div></div>
+}
+else if (notFound)
+{
+    <div class="alert-error no-print">Không tìm thấy chuyến giao <b>@Code</b>.</div>
+    <a href="/van-chuyen" class="btn-outline no-print">← Về danh sách chuyến</a>
+}
+else
+{
+    <div class="no-print toolbar">
+        <div>
+            <h1>In phiếu chuyến @trip!.TripCode</h1>
+            <p>@trip.Orders.Count phiếu — mỗi phiếu 1 trang A5, ngắt trang tự động.</p>
+        </div>
+        <div class="toolbar-actions">
+            <a href="/van-chuyen/@Code" class="btn-outline">← Về chuyến giao</a>
+            <button class="btn-primary" @onclick="Print">🖨️ In tất cả</button>
+        </div>
+    </div>
+
+    @foreach (var order in trip.Orders)
+    {
+        <PhieuGiaoHang Order="order" />
+    }
+}
+
+<style>
+    .toolbar { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+    .toolbar-actions { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
+    .btn-outline {
+        border: 1px solid var(--line-strong); color: var(--ink); background: var(--surface);
+        padding: 0.55rem 1rem; border-radius: 8px; font-weight: 600; font-size: 0.85rem; text-decoration: none;
+        display: inline-block; cursor: pointer;
+    }
+    .btn-primary {
+        background: var(--brand); color: #fff; border: none; border-radius: 8px;
+        padding: 0.6rem 1.2rem; font-weight: 600; cursor: pointer; font-size: 0.85rem;
+    }
+
+    /* Mỗi PhieuGiaoHang tự lo layout/khổ A5 của chính nó — trang này chỉ xếp
+       chúng liên tiếp và ẩn toolbar khi in. */
+    @@media print {
+        .no-print { display: none !important; }
+    }
+</style>
+
+@code {
+    [Parameter] public string Code { get; set; } = "";
+
+    private DeliveryTrip? trip;
+    private bool notFound;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        trip = null;
+        notFound = false;
+        var result = await Api.GetTripByCodeAsync(Code);
+        if (result is null) notFound = true;
+        else trip = result;
+    }
+
+    private async Task Print() => await JS.InvokeVoidAsync("print");
+}
