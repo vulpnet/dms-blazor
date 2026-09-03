@@ -89,6 +89,10 @@ app.UseCors("BlazorClient");
 
 app.UseAuthorization();
 
+// Endpoint nhẹ để cron-job ping định kỳ giữ service không bị Render free tier
+// cho ngủ sau 15 phút không hoạt động — không chạm DB để không tốn tài nguyên.
+app.MapGet("/health", () => Results.Ok("ok"));
+
 app.MapControllers();
 
 app.Run();
