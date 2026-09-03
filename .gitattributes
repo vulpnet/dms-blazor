@@ -1,0 +1,3 @@
+# Script shell phải giữ line ending LF — CRLF sẽ làm build thất bại trên
+# môi trường Linux của Vercel/Render với lỗi "bad interpreter".
+*.sh text eol=lf
