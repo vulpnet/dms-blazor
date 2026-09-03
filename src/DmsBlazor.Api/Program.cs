@@ -1,7 +1,28 @@
 using DmsBlazor.Api.Data;
 using Microsoft.EntityFrameworkCore;
 
-var builder = WebApplication.CreateBuilder(args);
+// Tắt tự-theo-dõi-thay-đổi file cấu hình (reloadOnChange) — mặc định ASP.NET Core
+// dùng FileSystemWatcher/inotify để tự nạp lại appsettings.json khi file đổi, tính
+// năng này vô dụng trong container Production và có thể làm crash app trên host có
+// giới hạn inotify thấp (như Render free tier: "user limit (128) on inotify instances").
+var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+{
+    Args = args,
+});
+builder.Configuration.Sources.Clear();
+builder.Configuration
+    .AddJsonFile("appsettings.json", optional: true, reloadOnChange: false)
+    .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: false);
+if (builder.Environment.IsDevelopment())
+{
+    // User Secrets (ConnectionStrings:DmsDb cho local dev) — CreateBuilder mặc định
+    // tự thêm nguồn này ở Development, nhưng Sources.Clear() ở trên đã xoá mất nên
+    // phải thêm lại thủ công.
+    builder.Configuration.AddUserSecrets<Program>();
+}
+builder.Configuration
+    .AddEnvironmentVariables()
+    .AddCommandLine(args);
 
 // Render.com cấp cổng lắng nghe qua biến môi trường PORT — nếu có thì phải bind
 // đúng cổng đó, nếu không container sẽ bị coi là "chưa sẵn sàng" và bị khởi động lại.
