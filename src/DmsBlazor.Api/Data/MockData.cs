@@ -3,9 +3,13 @@ using DmsBlazor.Shared.Models;
 namespace DmsBlazor.Api.Data;
 
 /// <summary>
-/// Dữ liệu mẫu tĩnh — port trực tiếp từ mock-data.ts/order-data.ts/shipment-data.ts
-/// của bản demo Next.js, cùng bối cảnh FMCG (nước giải khát/thực phẩm).
-/// Dùng để chạy demo ngay mà chưa cần kết nối database thật.
+/// Dữ liệu mẫu — port từ mock-data.ts/order-data.ts/shipment-data.ts của bản demo
+/// Next.js, cùng bối cảnh FMCG (nước giải khát/thực phẩm).
+///
+/// Distributors/Products/Shipments giờ dùng làm DỮ LIỆU SEED nạp 1 lần vào Supabase
+/// Postgres (xem DbInitializer.cs) — các controller không đọc trực tiếp từ đây nữa,
+/// mà đọc qua DmsDbContext. Riêng GetDashboard() vẫn trả trực tiếp vì Dashboard
+/// hiện là số liệu tổng hợp minh hoạ, chưa tính từ dữ liệu đơn hàng thật.
 /// </summary>
 public static class MockData
 {

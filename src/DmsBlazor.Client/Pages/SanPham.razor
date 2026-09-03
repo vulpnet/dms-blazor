@@ -1,0 +1,332 @@
+@page "/san-pham"
+@using System.ComponentModel.DataAnnotations
+@using DmsBlazor.Shared.Models
+@using DmsBlazor.Client.Services
+@inject DmsApiClient Api
+
+<PageTitle>Quản lý sản phẩm — DMS</PageTitle>
+
+<div class="page-header page-header-row">
+    <div>
+        <h1>Quản lý sản phẩm</h1>
+        <p>Danh mục sản phẩm dùng trong đặt hàng — thêm, sửa, xoá trực tiếp tại đây.</p>
+    </div>
+    <button class="btn-primary" @onclick="OpenCreateForm">+ Thêm sản phẩm</button>
+</div>
+
+@if (errorMessage is not null)
+{
+    <div class="alert-error">@errorMessage</div>
+}
+
+@if (products is null)
+{
+    <div class="skeleton-row">
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+    </div>
+}
+else if (products.Count == 0)
+{
+    <p class="muted">Chưa có sản phẩm nào. Bấm "Thêm sản phẩm" để bắt đầu.</p>
+}
+else
+{
+    <div class="card">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th></th>
+                    <th>Mã</th>
+                    <th>Tên sản phẩm</th>
+                    <th>Danh mục</th>
+                    <th>Giá thùng</th>
+                    <th>Giá lẻ</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var p in products)
+                {
+                    <tr>
+                        <td>@p.Emoji</td>
+                        <td><code>@p.Code</code></td>
+                        <td>@p.Name</td>
+                        <td>@p.Category</td>
+                        <td>@p.PricePerCase.ToString("N0")k / @p.CaseSize @p.Unit</td>
+                        <td>@p.PricePerUnit.ToString("N0")k / @p.Unit</td>
+                        <td class="row-actions">
+                            <button class="btn-link" @onclick="() => OpenEditForm(p)">Sửa</button>
+                            <button class="btn-link danger" @onclick="() => ConfirmDelete(p)">Xoá</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@if (showForm)
+{
+    <div class="modal-backdrop" @onclick="CloseForm">
+        <div class="modal-panel" @onclick:stopPropagation="true">
+            <h3>@(editingId is null ? "Thêm sản phẩm" : "Sửa sản phẩm")</h3>
+
+            <EditForm Model="formModel" OnValidSubmit="SaveProduct">
+                <DataAnnotationsValidator />
+
+                <div class="field">
+                    <label for="f-code">Mã sản phẩm</label>
+                    <InputText id="f-code" @bind-Value="formModel.Code" placeholder="vd: cola-330" />
+                </div>
+                <div class="field">
+                    <label for="f-name">Tên sản phẩm</label>
+                    <InputText id="f-name" @bind-Value="formModel.Name" placeholder="vd: Nước ngọt Cola 330ml" />
+                </div>
+                <div class="field-row">
+                    <div class="field">
+                        <label for="f-category">Danh mục</label>
+                        <InputText id="f-category" @bind-Value="formModel.Category" placeholder="vd: Nước giải khát" />
+                    </div>
+                    <div class="field">
+                        <label for="f-emoji">Biểu tượng</label>
+                        <InputText id="f-emoji" @bind-Value="formModel.Emoji" placeholder="🥤" />
+                    </div>
+                </div>
+                <div class="field-row">
+                    <div class="field">
+                        <label for="f-unit">Đơn vị lẻ</label>
+                        <InputText id="f-unit" @bind-Value="formModel.Unit" placeholder="vd: lon, chai, hộp" />
+                    </div>
+                    <div class="field">
+                        <label for="f-casesize">Số đơn vị / thùng</label>
+                        <InputNumber id="f-casesize" @bind-Value="formModel.CaseSize" />
+                    </div>
+                </div>
+                <div class="field-row">
+                    <div class="field">
+                        <label for="f-pricecase">Giá 1 thùng (nghìn đ)</label>
+                        <InputNumber id="f-pricecase" @bind-Value="formModel.PricePerCase" />
+                    </div>
+                    <div class="field">
+                        <label for="f-priceunit">Giá 1 đơn vị lẻ (nghìn đ)</label>
+                        <InputNumber id="f-priceunit" @bind-Value="formModel.PricePerUnit" />
+                    </div>
+                </div>
+
+                @if (formError is not null)
+                {
+                    <div class="alert-error">@formError</div>
+                }
+
+                <div class="modal-actions">
+                    <button type="button" class="btn-outline" @onclick="CloseForm">Huỷ</button>
+                    <button type="submit" class="btn-primary" disabled="@saving">
+                        @(saving ? "Đang lưu..." : "Lưu")
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@if (confirmingDelete is not null)
+{
+    <div class="modal-backdrop" @onclick="() => confirmingDelete = null">
+        <div class="modal-panel modal-panel-sm" @onclick:stopPropagation="true">
+            <h3>Xoá sản phẩm?</h3>
+            <p class="muted">Sản phẩm <b>@confirmingDelete.Name</b> sẽ bị xoá vĩnh viễn khỏi danh mục.</p>
+            <div class="modal-actions">
+                <button class="btn-outline" @onclick="() => confirmingDelete = null">Huỷ</button>
+                <button class="btn-danger" @onclick="DeleteProduct">Xoá</button>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .page-header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
+    .alert-error {
+        background: var(--danger-soft);
+        color: var(--danger);
+        border: 1px solid #f3c1cb;
+        border-radius: 8px;
+        padding: 0.7rem 1rem;
+        font-size: 0.85rem;
+        margin-bottom: 1rem;
+    }
+    .row-actions { white-space: nowrap; text-align: right; }
+    .btn-link {
+        background: none; border: none; cursor: pointer;
+        color: var(--brand); font-weight: 600; font-size: 0.83rem;
+        padding: 0.2rem 0.4rem;
+    }
+    .btn-link.danger { color: var(--danger); }
+    .btn-link:hover { text-decoration: underline; }
+
+    .modal-backdrop {
+        position: fixed; inset: 0;
+        background: rgba(15, 23, 42, 0.45);
+        display: flex; align-items: center; justify-content: center;
+        padding: 1rem;
+        z-index: 50;
+    }
+    .modal-panel {
+        background: var(--surface);
+        border-radius: var(--radius);
+        padding: 1.5rem;
+        width: 100%;
+        max-width: 480px;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: var(--shadow-md);
+    }
+    .modal-panel-sm { max-width: 380px; }
+    .modal-panel h3 { font-size: 1.05rem; margin-bottom: 1rem; }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 1.25rem; }
+    .btn-danger {
+        background: var(--danger); color: #fff; border: none;
+        border-radius: 8px; padding: 0.6rem 1.2rem; font-weight: 600; cursor: pointer; font-size: 0.88rem;
+    }
+
+    /* InputText/InputNumber render ra <input> chuẩn — style chung cho form */
+    .field input {
+        width: 100%;
+        padding: 0.55rem 0.7rem;
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        font-size: 0.88rem;
+        margin-top: 0.35rem;
+    }
+</style>
+
+@code {
+    private List<Product>? products;
+    private string? errorMessage;
+
+    private bool showForm;
+    private int? editingId;
+    private ProductFormModel formModel = new();
+    private string? formError;
+    private bool saving;
+
+    private Product? confirmingDelete;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProducts();
+    }
+
+    private async Task LoadProducts()
+    {
+        try
+        {
+            products = await Api.GetManagedProductsAsync();
+        }
+        catch
+        {
+            errorMessage = "Không tải được danh sách sản phẩm. Kiểm tra kết nối tới máy chủ.";
+        }
+    }
+
+    private void OpenCreateForm()
+    {
+        editingId = null;
+        formModel = new ProductFormModel();
+        formError = null;
+        showForm = true;
+    }
+
+    private void OpenEditForm(Product p)
+    {
+        editingId = p.Id;
+        formModel = new ProductFormModel
+        {
+            Code = p.Code,
+            Name = p.Name,
+            Category = p.Category,
+            Unit = p.Unit,
+            CaseSize = p.CaseSize,
+            PricePerCase = p.PricePerCase,
+            PricePerUnit = p.PricePerUnit,
+            Emoji = p.Emoji
+        };
+        formError = null;
+        showForm = true;
+    }
+
+    private void CloseForm() => showForm = false;
+
+    private async Task SaveProduct()
+    {
+        saving = true;
+        formError = null;
+
+        var product = new Product
+        {
+            Code = formModel.Code.Trim(),
+            Name = formModel.Name.Trim(),
+            Category = formModel.Category.Trim(),
+            Unit = formModel.Unit.Trim(),
+            CaseSize = formModel.CaseSize,
+            PricePerCase = formModel.PricePerCase,
+            PricePerUnit = formModel.PricePerUnit,
+            Emoji = string.IsNullOrWhiteSpace(formModel.Emoji) ? "📦" : formModel.Emoji.Trim()
+        };
+
+        var (success, error) = editingId is null
+            ? await Api.CreateProductAsync(product)
+            : await Api.UpdateProductAsync(editingId.Value, product);
+
+        saving = false;
+
+        if (!success)
+        {
+            formError = error ?? "Lưu không thành công.";
+            return;
+        }
+
+        showForm = false;
+        await LoadProducts();
+    }
+
+    private void ConfirmDelete(Product p) => confirmingDelete = p;
+
+    private async Task DeleteProduct()
+    {
+        if (confirmingDelete is null) return;
+        await Api.DeleteProductAsync(confirmingDelete.Id);
+        confirmingDelete = null;
+        await LoadProducts();
+    }
+
+    /// Model form riêng thay vì bind thẳng vào Product — tránh gửi Id lên khi tạo mới
+    /// và tách biệt validation khỏi entity dùng chung với các trang khác.
+    public class ProductFormModel
+    {
+        [Required(ErrorMessage = "Bắt buộc nhập mã sản phẩm")]
+        public string Code { get; set; } = "";
+
+        [Required(ErrorMessage = "Bắt buộc nhập tên sản phẩm")]
+        public string Name { get; set; } = "";
+
+        [Required(ErrorMessage = "Bắt buộc nhập danh mục")]
+        public string Category { get; set; } = "";
+
+        [Required(ErrorMessage = "Bắt buộc nhập đơn vị")]
+        public string Unit { get; set; } = "";
+
+        [Range(1, 1000, ErrorMessage = "Số đơn vị/thùng phải từ 1 đến 1000")]
+        public int CaseSize { get; set; } = 24;
+
+        [Range(0, 1000000, ErrorMessage = "Giá không hợp lệ")]
+        public decimal PricePerCase { get; set; }
+
+        [Range(0, 1000000, ErrorMessage = "Giá không hợp lệ")]
+        public decimal PricePerUnit { get; set; }
+
+        public string Emoji { get; set; } = "📦";
+    }
+}

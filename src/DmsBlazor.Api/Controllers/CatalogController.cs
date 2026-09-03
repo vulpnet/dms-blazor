@@ -1,16 +1,19 @@
 using DmsBlazor.Api.Data;
 using DmsBlazor.Shared.Models;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace DmsBlazor.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class CatalogController : ControllerBase
+public class CatalogController(DmsDbContext db) : ControllerBase
 {
     [HttpGet("distributors")]
-    public ActionResult<List<Distributor>> GetDistributors() => MockData.Distributors;
+    public async Task<ActionResult<List<Distributor>>> GetDistributors() =>
+        await db.Distributors.OrderBy(d => d.Name).ToListAsync();
 
     [HttpGet("products")]
-    public ActionResult<List<Product>> GetProducts() => MockData.Products;
+    public async Task<ActionResult<List<Product>>> GetProducts() =>
+        await db.Products.OrderBy(p => p.Name).ToListAsync();
 }

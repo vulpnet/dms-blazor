@@ -1,3 +1,6 @@
+using DmsBlazor.Api.Data;
+using Microsoft.EntityFrameworkCore;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Render.com cấp cổng lắng nghe qua biến môi trường PORT — nếu có thì phải bind
@@ -14,6 +17,17 @@ builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
+// Connection string đọc từ: User Secrets (local dev, không nằm trong repo) hoặc
+// biến môi trường ConnectionStrings__DmsDb (Render Production) — KHÔNG BAO GIỜ
+// đặt connection string thật vào file appsettings*.json commit lên Git.
+var connectionString = builder.Configuration.GetConnectionString("DmsDb")
+    ?? throw new InvalidOperationException(
+        "Thiếu connection string 'DmsDb'. Local: chạy 'dotnet user-secrets set " +
+        "\"ConnectionStrings:DmsDb\" \"<connection-string>\"'. Render: thêm biến môi " +
+        "trường ConnectionStrings__DmsDb.");
+
+builder.Services.AddDbContext<DmsDbContext>(options => options.UseNpgsql(connectionString));
+
 // Blazor WASM chạy trên domain khác API khi deploy lên Render (2 service riêng biệt)
 // nên bắt buộc bật CORS. Danh sách origin đọc từ appsettings để không phải sửa code
 // mỗi lần đổi domain deploy.
@@ -29,6 +43,13 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+// Tạo bảng + nạp dữ liệu mẫu lần đầu (nếu database còn trống) ngay khi khởi động
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<DmsDbContext>();
+    await DbInitializer.InitializeAsync(db);
+}
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

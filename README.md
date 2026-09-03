@@ -51,17 +51,37 @@ Nếu đổi port, cập nhật 2 chỗ để khớp:
 - `src/DmsBlazor.Client/wwwroot/appsettings.json` → `ApiBaseUrl`
 - `src/DmsBlazor.Api/appsettings.Development.json` → `AllowedOrigins`
 
-## Kết nối database thật (chưa làm — bước tiếp theo)
+## Kết nối database
 
-Hiện API dùng dữ liệu mẫu tĩnh trong `DmsBlazor.Api/Data/MockData.cs` (port từ `mock-data.ts`,
-`order-data.ts`, `shipment-data.ts` bên bản Next.js) để chạy demo ngay không cần chờ setup
-database. Khi sẵn sàng dùng dữ liệu thật:
+API đã nối **Supabase Postgres thật** (dùng chung project với `apps/showcase` — bảng của DMS
+không trùng tên với bảng showcase). `DmsBlazor.Api/Data/MockData.cs` giờ chỉ là **dữ liệu
+seed** nạp 1 lần vào database khi khởi động lần đầu (`DbInitializer.cs`), không còn bị
+controller đọc trực tiếp.
 
-1. Tạo project Supabase riêng (không dùng chung với `apps/showcase`)
-2. Thêm connection string Postgres vào `appsettings.json` của `DmsBlazor.Api`
-3. Viết `DbContext` (Entity Framework Core, gói `Npgsql.EntityFrameworkCore.PostgreSQL` đã cài
-   sẵn) map vào các bảng tương ứng model trong `DmsBlazor.Shared/Models/`
-4. Thay các controller đang đọc từ `MockData` sang đọc từ `DbContext`
+**Cấu hình connection string — KHÔNG BAO GIỜ đặt vào file appsettings*.json commit lên Git:**
+
+- **Local dev:** dùng .NET User Secrets (lưu ngoài repo, ở `%APPDATA%`/`~/.microsoft/usersecrets`):
+  ```bash
+  cd src/DmsBlazor.Api
+  dotnet user-secrets set "ConnectionStrings:DmsDb" "Host=<pooler-host>;Port=5432;Database=postgres;Username=postgres.<project-ref>;Password=<mật khẩu>"
+  ```
+  Lấy `<pooler-host>` và `<project-ref>` từ Supabase Dashboard → project → nút **Connect** →
+  chọn **Session pooler** (không dùng **Direct connection** — host đó có thể không phân giải
+  được DNS trên một số mạng do chỉ hỗ trợ IPv6).
+
+- **Render (Production):** thêm biến môi trường `ConnectionStrings__DmsDb` (2 dấu gạch dưới,
+  đây là quy ước .NET để map vào cấu trúc `ConnectionStrings:DmsDb`) trong **Environment**
+  của Web Service trên Render Dashboard, giá trị theo đúng định dạng ở trên.
+
+**Schema quản lý bằng EF Core Migrations** (không dùng `EnsureCreatedAsync` vì database dùng
+chung với showcase đã có sẵn bảng khác — `EnsureCreatedAsync` sẽ tưởng nhầm "đã có schema" rồi
+bỏ qua việc tạo bảng DMS). Khi đổi model, tạo migration mới:
+```bash
+cd src/DmsBlazor.Api
+dotnet ef migrations add <TênMigration>
+```
+`DbInitializer.InitializeAsync()` tự áp dụng mọi migration chưa chạy (`MigrateAsync()`) mỗi
+lần API khởi động — không cần chạy tay `dotnet ef database update`.
 
 ## Deploy: API lên Render, Client lên Vercel
 
@@ -114,13 +134,18 @@ src/
     Models/           Product, Order, Shipment, Dashboard...
     Services/         OrderPricingService.cs — logic tính giá/khuyến mãi
   DmsBlazor.Api/
-    Controllers/       CatalogController, DashboardController, OrdersController, ShipmentsController
-    Data/MockData.cs   Dữ liệu mẫu tĩnh (thay bằng DbContext khi nối database thật)
-    Program.cs         Cấu hình CORS + bind cổng theo biến PORT (Render)
+    Controllers/       CatalogController, DashboardController, OrdersController,
+                       ShipmentsController, ProductsController (CRUD quản lý sản phẩm)
+    Data/DmsDbContext.cs    EF Core DbContext — map Distributor/Product/Shipment vào Postgres
+    Data/DbInitializer.cs   Tự áp dụng migration + seed dữ liệu mẫu khi khởi động
+    Data/MockData.cs        Dữ liệu SEED (không còn bị đọc trực tiếp) + GetDashboard() tĩnh
+    Migrations/             EF Core Migrations — tạo mới bằng 'dotnet ef migrations add'
+    Program.cs         Cấu hình CORS + bind cổng theo biến PORT (Render) + đăng ký DbContext
     Dockerfile          Build image cho Render — build context phải là thư mục gốc dms-blazor/
     appsettings.Production.json   AllowedOrigins — điền URL Vercel thật sau khi deploy
   DmsBlazor.Client/
-    Pages/             Home, Dashboard, DatHang, VanChuyen + component dùng chung (Kpi, BarChart)
+    Pages/             Home, Dashboard, DatHang, VanChuyen, SanPham (quản lý sản phẩm CRUD)
+                       + component dùng chung (Kpi, BarChart)
     Services/DmsApiClient.cs   Gọi API tập trung, không rải HttpClient khắp các trang
     wwwroot/appsettings.json              Cấu hình ApiBaseUrl cho local dev
     wwwroot/appsettings.Production.json   ApiBaseUrl — điền URL Render thật sau khi deploy

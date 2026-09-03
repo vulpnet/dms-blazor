@@ -37,4 +37,29 @@ public class DmsApiClient(HttpClient http)
         var qs = query.Count > 0 ? "?" + string.Join("&", query) : "";
         return http.GetFromJsonAsync<List<Shipment>>($"api/shipments{qs}");
     }
+
+    // ===== Quản lý sản phẩm (CRUD) =====
+
+    public Task<List<Product>?> GetManagedProductsAsync() =>
+        http.GetFromJsonAsync<List<Product>>("api/products");
+
+    public async Task<(bool Success, string? Error)> CreateProductAsync(Product product)
+    {
+        var res = await http.PostAsJsonAsync("api/products", product);
+        if (res.IsSuccessStatusCode) return (true, null);
+        return (false, await res.Content.ReadAsStringAsync());
+    }
+
+    public async Task<(bool Success, string? Error)> UpdateProductAsync(int id, Product product)
+    {
+        var res = await http.PutAsJsonAsync($"api/products/{id}", product);
+        if (res.IsSuccessStatusCode) return (true, null);
+        return (false, await res.Content.ReadAsStringAsync());
+    }
+
+    public async Task<bool> DeleteProductAsync(int id)
+    {
+        var res = await http.DeleteAsync($"api/products/{id}");
+        return res.IsSuccessStatusCode;
+    }
 }
