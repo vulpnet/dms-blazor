@@ -5,11 +5,18 @@
 
 <PageTitle>Vận chuyển — DMS</PageTitle>
 
-<h1>Demo Theo dõi vận chuyển</h1>
+<div class="page-header">
+    <h1>Theo dõi vận chuyển</h1>
+    <p>Trạng thái, vị trí trên tuyến đường và cảnh báo trễ hẹn theo thời gian thực.</p>
+</div>
 
 @if (shipments is null)
 {
-    <p>Đang tải...</p>
+    <div class="skeleton-row">
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+    </div>
 }
 else
 {
@@ -19,11 +26,11 @@ else
         <Kpi Label="Đã giao thành công" Value="@shipments.Count(s => s.Status == ShipmentStatus.Delivered).ToString()" Tone="ok" />
     </div>
 
-    <div class="filters">
-        <button class="@(statusFilter is null ? "chip active" : "chip")" @onclick="() => SetStatusFilter(null)">Tất cả</button>
+    <div class="filters" role="tablist">
+        <button role="tab" aria-selected="@(statusFilter is null)" class="@(statusFilter is null ? "chip active" : "chip")" @onclick="() => SetStatusFilter(null)">Tất cả</button>
         @foreach (var st in Enum.GetValues<ShipmentStatus>())
         {
-            <button class="@(statusFilter == st ? "chip active" : "chip")" @onclick="() => SetStatusFilter(st)">@StatusLabel(st)</button>
+            <button role="tab" aria-selected="@(statusFilter == st)" class="@(statusFilter == st ? "chip active" : "chip")" @onclick="() => SetStatusFilter(st)">@StatusLabel(st)</button>
         }
     </div>
 
@@ -34,7 +41,7 @@ else
                 <button class="@(selected?.Id == s.Id ? "ship-item selected" : "ship-item")" @onclick="() => selected = s">
                     <div class="ship-row">
                         <b>@s.Code</b>
-                        <span class="badge @StatusBadgeClass(s.Status)">@StatusLabel(s.Status)</span>
+                        <span class="ship-badge @StatusBadgeClass(s.Status)">@StatusLabel(s.Status)</span>
                     </div>
                     <div>@s.Distributor</div>
                     <div class="muted">@s.Region · @EtaLabel(s.EtaHours)</div>
@@ -50,7 +57,7 @@ else
                         <h3>@selected.Code</h3>
                         <div class="muted">@selected.Distributor</div>
                     </div>
-                    <span class="badge @StatusBadgeClass(selected.Status)">@StatusLabel(selected.Status)</span>
+                    <span class="ship-badge @StatusBadgeClass(selected.Status)">@StatusLabel(selected.Status)</span>
                 </div>
 
                 <div class="detail-meta">
@@ -85,35 +92,76 @@ else
 }
 
 <style>
-    .filters { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 1rem 0; }
-    .chip { padding: 0.4rem 0.9rem; border-radius: 999px; border: none; background: #f1f5f9; color: #475569; cursor: pointer; font-size: 0.85rem; }
-    .chip.active { background: #2563eb; color: #fff; }
-    .shipment-layout { display: grid; grid-template-columns: 1fr 1.4fr; gap: 1.5rem; }
+    .filters { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
+    .chip {
+        padding: 0.45rem 0.9rem;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: var(--surface);
+        color: var(--muted);
+        cursor: pointer;
+        font-size: 0.83rem;
+        font-weight: 500;
+    }
+    .chip:hover { border-color: var(--brand); color: var(--brand); }
+    .chip.active { background: var(--brand); border-color: var(--brand); color: #fff; }
+
+    .shipment-layout { display: grid; grid-template-columns: 1fr 1.4fr; gap: 1.25rem; }
+    @@media (max-width: 860px) {
+        .shipment-layout { grid-template-columns: 1fr; }
+    }
     .shipment-list { display: flex; flex-direction: column; gap: 0.5rem; }
-    .ship-item { text-align: left; border: 1px solid #e2e8f0; border-radius: 10px; padding: 0.8rem; background: #fff; cursor: pointer; }
-    .ship-item.selected { border-color: #2563eb; background: #eff6ff; }
-    .ship-row { display: flex; justify-content: space-between; margin-bottom: 0.3rem; }
-    .badge { font-size: 0.72rem; padding: 0.2rem 0.55rem; border-radius: 999px; font-weight: 600; }
-    .badge.picked { background: #f1f5f9; color: #475569; }
-    .badge.transit { background: #dbeafe; color: #1e40af; }
-    .badge.delivery { background: #fef3c7; color: #92400e; }
-    .badge.delivered { background: #dcfce7; color: #166534; }
-    .badge.delayed { background: #fee2e2; color: #991b1b; }
-    .badge.ok { background: #dcfce7; color: #166534; }
-    .badge.danger { background: #fee2e2; color: #991b1b; }
-    .shipment-detail { border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem; }
-    .detail-header { display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem; }
-    .detail-meta { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-bottom: 1.25rem; font-size: 0.88rem; }
-    .route-labels { display: flex; justify-content: space-between; font-size: 0.78rem; color: #64748b; }
-    .route-track { position: relative; height: 8px; background: #e2e8f0; border-radius: 999px; margin: 0.4rem 0 1.25rem; }
+    .ship-item {
+        text-align: left;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 0.85rem;
+        background: var(--surface);
+        cursor: pointer;
+        box-shadow: var(--shadow-sm);
+    }
+    .ship-item:hover { border-color: var(--line-strong); }
+    .ship-item.selected { border-color: var(--brand); background: var(--brand-soft); box-shadow: none; }
+    .ship-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem; }
+
+    .ship-badge { font-size: 0.72rem; padding: 0.22rem 0.6rem; border-radius: 999px; font-weight: 650; }
+    .ship-badge.picked { background: #eef1f5; color: #475569; }
+    .ship-badge.transit { background: var(--brand-soft); color: var(--brand); }
+    .ship-badge.delivery { background: var(--warning-soft); color: var(--warning); }
+    .ship-badge.delivered { background: var(--success-soft); color: var(--success); }
+    .ship-badge.delayed { background: var(--danger-soft); color: var(--danger); }
+
+    .shipment-detail {
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 1.35rem;
+        background: var(--surface);
+        box-shadow: var(--shadow-sm);
+    }
+    .detail-header { display: flex; justify-content: space-between; align-items: start; margin-bottom: 1.1rem; }
+    .detail-header h3 { font-size: 1.05rem; margin-bottom: 0.2rem; }
+    .detail-meta { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-bottom: 1.4rem; font-size: 0.87rem; }
+    .detail-meta > div > div:last-child { font-weight: 600; margin-top: 0.15rem; }
+
+    .route-labels { display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--muted); }
+    .route-track { position: relative; height: 8px; background: var(--canvas); border-radius: 999px; margin: 0.45rem 0 1.4rem; overflow: hidden; }
     .route-fill { position: absolute; inset: 0 auto 0 0; border-radius: 999px; transition: width 0.3s; }
-    .timeline { list-style: none; padding: 0; margin: 0.5rem 0 0; }
-    .timeline li { display: flex; gap: 0.6rem; margin-bottom: 0.9rem; }
-    .timeline .dot { width: 24px; height: 24px; border-radius: 999px; background: #f1f5f9; color: #94a3b8; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; flex-shrink: 0; }
-    .timeline li.done .dot { background: #dcfce7; color: #166534; }
-    .timeline li.delayed .dot { background: #fee2e2; color: #991b1b; }
-    .step-label { font-size: 0.9rem; font-weight: 600; }
-    .muted { color: #94a3b8; font-size: 0.82rem; }
+
+    .shipment-detail h4 { font-size: 0.88rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 0.85rem; }
+    .timeline { list-style: none; padding: 0; margin: 0; }
+    .timeline li { display: flex; gap: 0.65rem; margin-bottom: 1rem; }
+    .timeline .dot {
+        width: 24px; height: 24px;
+        border-radius: 999px;
+        background: var(--canvas);
+        color: var(--muted);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 0.75rem; font-weight: 700; flex-shrink: 0;
+    }
+    .timeline li.done .dot { background: var(--success-soft); color: var(--success); }
+    .timeline li.delayed .dot { background: var(--danger-soft); color: var(--danger); }
+    .step-label { font-size: 0.9rem; font-weight: 600; color: var(--ink); }
+    .muted { color: var(--muted); font-size: 0.82rem; }
 </style>
 
 @code {

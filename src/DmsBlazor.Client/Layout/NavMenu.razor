@@ -1,32 +1,33 @@
-<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
+<div class="sidebar @(collapseNavMenu ? "" : "open")">
+    <div class="brand-row">
+        <div class="brand-mark">DL</div>
         <a class="navbar-brand" href="">DMS &amp; Logistics</a>
-        <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
-            <span class="navbar-toggler-icon"></span>
-        </button>
     </div>
-</div>
 
-<div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu">
-    <nav class="nav flex-column">
-        <div class="nav-item px-3">
+    <button class="navbar-toggler" title="Mở menu" @onclick="ToggleNavMenu">☰</button>
+
+    <nav class="nav-scrollable">
+        <div class="nav-group-label">Tổng quan</div>
+        <div class="nav-item">
             <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Tổng quan
+                <span class="nav-icon">🏠</span> Tổng quan sản phẩm
             </NavLink>
         </div>
-        <div class="nav-item px-3">
+
+        <div class="nav-group-label">Vận hành</div>
+        <div class="nav-item">
             <NavLink class="nav-link" href="dashboard">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Báo cáo quản trị
+                <span class="nav-icon">📊</span> Báo cáo quản trị
             </NavLink>
         </div>
-        <div class="nav-item px-3">
+        <div class="nav-item">
             <NavLink class="nav-link" href="dat-hang">
-                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Đặt hàng
+                <span class="nav-icon">🛒</span> Đặt hàng
             </NavLink>
         </div>
-        <div class="nav-item px-3">
+        <div class="nav-item">
             <NavLink class="nav-link" href="van-chuyen">
-                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Vận chuyển
+                <span class="nav-icon">🚚</span> Vận chuyển
             </NavLink>
         </div>
     </nav>
@@ -34,8 +35,6 @@
 
 @code {
     private bool collapseNavMenu = true;
-
-    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
 
     private void ToggleNavMenu()
     {

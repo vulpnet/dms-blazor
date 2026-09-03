@@ -3,36 +3,41 @@
 <PageTitle>DMS & Logistics — Tổng quan</PageTitle>
 
 <div class="hero">
+    <span class="eyebrow">Nền tảng quản lý phân phối</span>
     <h1>Hệ thống quản lý phân phối &amp; vận chuyển</h1>
-    <p>Toàn bộ chuỗi phân phối — từ đặt hàng, tồn kho, công nợ đến giao hàng — theo dõi trên cùng một hệ thống.</p>
+    <p>Toàn bộ chuỗi phân phối — từ đặt hàng, tồn kho, công nợ đến giao hàng — theo dõi trên cùng một hệ thống, cập nhật theo thời gian thực.</p>
     <div class="hero-actions">
         <a class="btn-primary" href="dashboard">Xem báo cáo quản trị →</a>
         <a class="btn-outline" href="dat-hang">Thử đặt hàng</a>
     </div>
 </div>
 
-<h2 class="section-title">4 module cốt lõi</h2>
+<div class="section-header">
+    <h2>4 module cốt lõi</h2>
+    <p>Mỗi module hoạt động độc lập nhưng dùng chung một nguồn dữ liệu.</p>
+</div>
+
 <div class="module-grid">
     <div class="module-card">
-        <div class="module-emoji">💰</div>
+        <div class="module-icon" style="background:var(--brand-soft);color:var(--brand)">💰</div>
         <h3>Bán hàng &amp; Đặt hàng</h3>
         <p>Nhân viên thị trường tạo đơn cho nhà phân phối theo giá sỉ, hoặc khách tự đặt hàng lẻ. Tự động tính chiết khấu theo bậc số lượng.</p>
         <a href="dat-hang">Xem demo →</a>
     </div>
     <div class="module-card">
-        <div class="module-emoji">📦</div>
+        <div class="module-icon" style="background:var(--success-soft);color:var(--success)">📦</div>
         <h3>Kho &amp; Tồn kho</h3>
         <p>Theo dõi mức tồn kho tại từng nhà phân phối theo thời gian thực, cảnh báo sớm khi sắp hết hàng hoặc tồn dư.</p>
         <a href="dashboard">Xem demo →</a>
     </div>
     <div class="module-card">
-        <div class="module-emoji">💳</div>
+        <div class="module-icon" style="background:var(--warning-soft);color:var(--warning)">💳</div>
         <h3>Công nợ &amp; Tài chính</h3>
         <p>Quản lý hạn mức tín dụng theo từng nhà phân phối, cảnh báo ngay khi công nợ vượt hạn mức hoặc quá hạn.</p>
         <a href="dashboard">Xem demo →</a>
     </div>
     <div class="module-card">
-        <div class="module-emoji">🚚</div>
+        <div class="module-icon" style="background:var(--danger-soft);color:var(--danger)">🚚</div>
         <h3>Vận chuyển &amp; Giao hàng</h3>
         <p>Theo dõi từng đơn hàng đang vận chuyển: vị trí trên tuyến đường, thời gian dự kiến, cảnh báo trễ hẹn.</p>
         <a href="van-chuyen">Xem demo →</a>
@@ -40,17 +45,114 @@
 </div>
 
 <style>
-    .hero { text-align: center; padding: 3rem 1rem; }
-    .hero h1 { font-size: 2rem; margin-bottom: 0.75rem; }
-    .hero p { color: #64748b; max-width: 640px; margin: 0 auto 1.5rem; }
-    .hero-actions { display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap; }
-    .btn-primary { background: #2563eb; color: #fff; padding: 0.7rem 1.5rem; border-radius: 8px; text-decoration: none; font-weight: 600; }
-    .btn-outline { border: 1px solid #cbd5e1; color: #334155; padding: 0.7rem 1.5rem; border-radius: 8px; text-decoration: none; font-weight: 600; }
-    .section-title { text-align: center; margin: 2.5rem 0 1.5rem; }
-    .module-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.25rem; padding: 0 1rem 2rem; }
-    .module-card { border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem; background: #f8fafc; }
-    .module-emoji { font-size: 1.8rem; margin-bottom: 0.5rem; }
-    .module-card h3 { margin: 0 0 0.5rem; font-size: 1.05rem; }
-    .module-card p { color: #64748b; font-size: 0.9rem; margin-bottom: 0.75rem; }
-    .module-card a { color: #2563eb; font-weight: 600; font-size: 0.9rem; text-decoration: none; }
+    .hero {
+        text-align: center;
+        padding: 2.5rem 1rem 3rem;
+        border-bottom: 1px solid var(--line);
+        margin-bottom: 2.5rem;
+    }
+    .eyebrow {
+        display: inline-block;
+        font-size: 0.75rem;
+        font-weight: 650;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--brand);
+        background: var(--brand-soft);
+        padding: 0.3rem 0.75rem;
+        border-radius: 999px;
+        margin-bottom: 1rem;
+    }
+    .hero h1 {
+        font-size: 2rem;
+        margin-bottom: 0.85rem;
+    }
+    .hero p {
+        color: var(--muted);
+        max-width: 620px;
+        margin: 0 auto 1.75rem;
+        font-size: 0.95rem;
+    }
+    .hero-actions {
+        display: flex;
+        gap: 0.75rem;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+    .btn-primary {
+        background: var(--brand);
+        color: #fff;
+        padding: 0.7rem 1.5rem;
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.9rem;
+    }
+    .btn-primary:hover {
+        background: var(--brand-hover);
+        text-decoration: none;
+    }
+    .btn-outline {
+        border: 1px solid var(--line-strong);
+        color: var(--ink);
+        padding: 0.7rem 1.5rem;
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.9rem;
+        background: var(--surface);
+    }
+    .btn-outline:hover {
+        border-color: var(--brand);
+        text-decoration: none;
+    }
+    .section-header {
+        text-align: center;
+        margin-bottom: 1.5rem;
+    }
+    .section-header h2 {
+        font-size: 1.3rem;
+    }
+    .section-header p {
+        color: var(--muted);
+        font-size: 0.88rem;
+        margin-top: 0.35rem;
+    }
+    .module-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.1rem;
+    }
+    .module-card {
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 1.35rem;
+        background: var(--surface);
+        box-shadow: var(--shadow-sm);
+    }
+    .module-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+        margin-bottom: 0.85rem;
+    }
+    .module-card h3 {
+        font-size: 1.02rem;
+        margin-bottom: 0.5rem;
+    }
+    .module-card p {
+        color: var(--muted);
+        font-size: 0.87rem;
+        margin-bottom: 0.85rem;
+        line-height: 1.55;
+    }
+    .module-card a {
+        color: var(--brand);
+        font-weight: 600;
+        font-size: 0.87rem;
+    }
 </style>

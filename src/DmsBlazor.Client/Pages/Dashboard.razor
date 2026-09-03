@@ -5,18 +5,25 @@
 
 <PageTitle>Báo cáo quản trị — DMS</PageTitle>
 
-<h1>Báo cáo quản trị</h1>
+<div class="page-header">
+    <h1>Báo cáo quản trị</h1>
+    <p>Theo dõi doanh số, tồn kho, công nợ và vận chuyển trên cùng một màn hình.</p>
+</div>
 
 @if (data is null)
 {
-    <p>Đang tải...</p>
+    <div class="skeleton-row">
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+    </div>
 }
 else
 {
-    <div class="tabs">
+    <div class="tabs" role="tablist">
         @foreach (var t in tabs)
         {
-            <button class="@(activeTab == t ? "tab active" : "tab")" @onclick="() => activeTab = t">@t</button>
+            <button role="tab" aria-selected="@(activeTab == t)" class="@(activeTab == t ? "tab active" : "tab")" @onclick="() => activeTab = t">@t</button>
         }
     </div>
 
@@ -30,7 +37,7 @@ else
 
         <div class="card">
             <h3>Doanh thu 6 tháng gần nhất</h3>
-            <BarChart Items="@(data.MonthlyRevenue.Select(m => (m.Month, (double)m.Revenue)).ToList())" Color="#2563eb" />
+            <BarChart Items="@(data.MonthlyRevenue.Select(m => (m.Month, (double)m.Revenue)).ToList())" Color="#1e4fd6" />
         </div>
 
         <div class="card">
@@ -105,7 +112,7 @@ else
         </div>
         <div class="card">
             <h3>Giao hàng đúng hẹn theo ngày</h3>
-            <BarChart Items="@(data.DeliveryStats.Select(d => (d.Day, (double)d.OnTime)).ToList())" Color="#16a34a" />
+            <BarChart Items="@(data.DeliveryStats.Select(d => (d.Day, (double)d.OnTime)).ToList())" Color="#0d8a4f" />
         </div>
     }
 }
@@ -122,8 +129,8 @@ else
 
     private static string InventoryColor(string status) => status switch
     {
-        "sắp hết" => "#dc2626",
-        "tồn dư" => "#f59e0b",
-        _ => "#16a34a"
+        "sắp hết" => "#c81e3a",
+        "tồn dư" => "#b45309",
+        _ => "#0d8a4f"
     };
 }

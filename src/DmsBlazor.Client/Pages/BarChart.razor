@@ -12,7 +12,7 @@
 
 @code {
     [Parameter] public List<(string Label, double Value)> Items { get; set; } = [];
-    [Parameter] public string Color { get; set; } = "#2563eb";
+    [Parameter] public string Color { get; set; } = "#1e4fd6";
 
     // Razor coi <text> là thẻ điều khiển của chính nó, xung đột với thẻ SVG <text>
     // cùng tên, nên phải dựng chuỗi SVG thủ công thay vì viết trực tiếp trong markup.
@@ -22,14 +22,16 @@
         if (max <= 0) max = 1;
 
         var sb = new System.Text.StringBuilder();
-        sb.Append($"<svg viewBox=\"0 0 {Items.Count * 60} 200\" preserveAspectRatio=\"none\">");
+        sb.Append($"<svg viewBox=\"0 0 {Items.Count * 60} 210\" preserveAspectRatio=\"none\">");
         for (int i = 0; i < Items.Count; i++)
         {
             var (label, value) = Items[i];
-            var barHeight = (value / max) * 160;
+            var barHeight = (value / max) * 145;
             var x = i * 60 + 10;
             var safeLabel = System.Net.WebUtility.HtmlEncode(label);
-            sb.Append($"<rect x=\"{x}\" y=\"{180 - barHeight}\" width=\"40\" height=\"{barHeight}\" fill=\"{Color}\" opacity=\"0.85\" rx=\"3\" />");
+            var valueLabel = System.Net.WebUtility.HtmlEncode(value.ToString("N0"));
+            sb.Append($"<text x=\"{x + 20}\" y=\"{Math.Max(12, 165 - barHeight)}\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"600\" fill=\"#0f172a\">{valueLabel}</text>");
+            sb.Append($"<rect x=\"{x}\" y=\"{175 - barHeight}\" width=\"40\" height=\"{barHeight}\" fill=\"{Color}\" rx=\"4\" />");
             sb.Append($"<text x=\"{x + 20}\" y=\"195\" text-anchor=\"middle\" font-size=\"11\" fill=\"#64748b\">{safeLabel}</text>");
         }
         sb.Append("</svg>");

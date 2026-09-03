@@ -63,22 +63,52 @@ database. Khi sẵn sàng dùng dữ liệu thật:
    sẵn) map vào các bảng tương ứng model trong `DmsBlazor.Shared/Models/`
 4. Thay các controller đang đọc từ `MockData` sang đọc từ `DbContext`
 
-## Deploy lên Render.com (miễn phí)
+## Deploy: API lên Render, Client lên Vercel
 
-1. Push code lên GitHub repo riêng
-2. Trên Render.com → **New Web Service** — tạo 2 service riêng:
-   - **API**: trỏ vào `src/DmsBlazor.Api`, Environment = Docker hoặc Native .NET runtime
-   - **Static Site**: build `src/DmsBlazor.Client` thành file tĩnh (`dotnet publish`), Render
-     phục vụ như 1 static site
-3. Sau khi có URL thật của API, cập nhật `src/DmsBlazor.Client/wwwroot/appsettings.json` →
-   `ApiBaseUrl` trỏ đúng URL đó, và `AllowedOrigins` trong `appsettings.json` (bản Production,
-   không phải Development) của API trỏ đúng URL của Client
-4. Lưu ý: Render free tier tự "ngủ" API sau ~15 phút không có truy cập — lần gọi đầu tiên sau
-   khi ngủ sẽ chậm (~30-50 giây) trong lúc container khởi động lại
+Vercel chỉ host được file tĩnh/serverless — không chạy được ASP.NET Core server thường trực.
+Nên **API bắt buộc host ở Render** (hoặc nơi tương đương chạy được container .NET), còn
+**Blazor WASM** (chỉ là file HTML/JS/WASM sau khi build) host ở Vercel giống hệt cách
+`apps/showcase` đã làm.
+
+### Bước 1 — Deploy API lên Render.com
+
+1. Push code lên GitHub repo (repo riêng cho `apps/dms-blazor`, hoặc trỏ Root Directory nếu
+   dùng chung monorepo)
+2. Render.com → **New** → **Web Service** → chọn **Docker** làm Environment
+3. Cấu hình:
+   - **Root Directory**: thư mục chứa `DmsBlazor.slnx` (vd trống nếu repo chỉ có mỗi project này)
+   - **Dockerfile Path**: `src/DmsBlazor.Api/Dockerfile`
+   - **Docker Build Context Directory**: `.` (thư mục gốc — Dockerfile cần copy cả
+     `DmsBlazor.Shared`, không chỉ riêng `DmsBlazor.Api`)
+4. Deploy xong sẽ có URL dạng `https://<tên-service>.onrender.com`
+5. **Lưu ý:** Render free tier tự "ngủ" service sau ~15 phút không có truy cập — lần gọi đầu
+   tiên sau khi ngủ sẽ chậm (~30-50 giây) trong lúc container khởi động lại
+
+### Bước 2 — Deploy Client lên Vercel
+
+1. Vào https://vercel.com → **Add New Project** → import cùng repo
+2. Vercel tự đọc `vercel.json` ở thư mục gốc (đã có sẵn — chỉ định `buildCommand` cài
+   workload WebAssembly rồi `dotnet publish`, và `outputDirectory` trỏ đúng thư mục
+   `wwwroot` sau khi publish)
+3. Trong **Environment Variables** không cần thêm gì — Blazor WASM đọc cấu hình từ file
+   JSON tĩnh (`wwwroot/appsettings.Production.json`), không phải biến môi trường Vercel
+4. Deploy xong sẽ có URL dạng `https://<tên-project>.vercel.app`
+
+### Bước 3 — Nối 2 domain với nhau (bắt buộc, làm SAU khi có cả 2 URL)
+
+Sau khi có URL thật của cả API và Client, phải sửa 2 file rồi push lại để build 2 domain
+"nhận nhau" (nếu bỏ qua bước này, Client gọi API sẽ bị chặn bởi CORS):
+
+1. `src/DmsBlazor.Client/wwwroot/appsettings.Production.json` → `ApiBaseUrl` đổi thành URL
+   Render thật (giữ dấu `/` ở cuối)
+2. `src/DmsBlazor.Api/appsettings.Production.json` → `AllowedOrigins` đổi thành URL Vercel
+   thật (không có dấu `/` ở cuối)
+3. Commit, push — cả Render và Vercel đều tự deploy lại khi có commit mới
 
 ## Cấu trúc thư mục
 
 ```
+vercel.json                Cấu hình build cho Vercel (chỉ build Client)
 src/
   DmsBlazor.Shared/
     Models/           Product, Order, Shipment, Dashboard...
@@ -86,10 +116,13 @@ src/
   DmsBlazor.Api/
     Controllers/       CatalogController, DashboardController, OrdersController, ShipmentsController
     Data/MockData.cs   Dữ liệu mẫu tĩnh (thay bằng DbContext khi nối database thật)
-    Program.cs         Cấu hình CORS cho phép Blazor Client gọi vào
+    Program.cs         Cấu hình CORS + bind cổng theo biến PORT (Render)
+    Dockerfile          Build image cho Render — build context phải là thư mục gốc dms-blazor/
+    appsettings.Production.json   AllowedOrigins — điền URL Vercel thật sau khi deploy
   DmsBlazor.Client/
     Pages/             Home, Dashboard, DatHang, VanChuyen + component dùng chung (Kpi, BarChart)
     Services/DmsApiClient.cs   Gọi API tập trung, không rải HttpClient khắp các trang
-    wwwroot/appsettings.json  Cấu hình ApiBaseUrl theo môi trường
+    wwwroot/appsettings.json              Cấu hình ApiBaseUrl cho local dev
+    wwwroot/appsettings.Production.json   ApiBaseUrl — điền URL Render thật sau khi deploy
   DmsBlazor.Tests/     Unit test logic tính giá
 ```

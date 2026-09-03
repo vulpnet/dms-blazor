@@ -1,0 +1,7 @@
+{
+  "buildCommand": "dotnet workload install wasm-tools && dotnet publish src/DmsBlazor.Client -c Release -o publish-output",
+  "outputDirectory": "publish-output/wwwroot",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
