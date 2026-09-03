@@ -1,0 +1,248 @@
+@page "/van-chuyen/{Code}"
+@using DmsBlazor.Shared.Models
+@using DmsBlazor.Client.Services
+@inject DmsApiClient Api
+
+<PageTitle>Chuyến giao @Code — DMS</PageTitle>
+
+@if (trip is null && !notFound)
+{
+    <div class="skeleton-row"><div class="skeleton-card"></div></div>
+}
+else if (notFound)
+{
+    <div class="alert-error">Không tìm thấy chuyến giao <b>@Code</b>.</div>
+    <a href="/van-chuyen" class="btn-outline">← Về danh sách chuyến</a>
+}
+else
+{
+    <div class="page-header page-header-row">
+        <div>
+            <h1>Chuyến @trip!.TripCode <span class="channel-badge @TripBadgeClass(trip.Status)">@TripStatusLabel(trip.Status)</span></h1>
+            <p>Tài xế @trip.DriverName · Xe @trip.VehiclePlate</p>
+        </div>
+        <div class="header-actions">
+            <a href="/van-chuyen" class="btn-outline">← Danh sách chuyến</a>
+            @if (trip.Status == TripStatus.Planning)
+            {
+                <button class="btn-primary" @onclick="Depart">🚚 Bắt đầu giao</button>
+            }
+        </div>
+    </div>
+
+    @if (actionError is not null)
+    {
+        <div class="alert-error">@actionError</div>
+    }
+
+    <div class="card">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Mã đơn</th>
+                    <th>Nhà phân phối</th>
+                    <th class="text-right">Tổng tiền</th>
+                    <th>Trạng thái giao</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var o in trip.Orders)
+                {
+                    <tr>
+                        <td><a href="/don-hang/@o.OrderCode" class="btn-link"><code>@o.OrderCode</code></a></td>
+                        <td>@(o.DistributorName ?? "—")</td>
+                        <td class="text-right">@o.Total.ToString("N0")k</td>
+                        <td>
+                            <span class="channel-badge @DeliveryBadgeClass(o.DeliveryStatus)">@DeliveryStatusLabel(o.DeliveryStatus)</span>
+                            @if (o.DeliveryStatus == OrderDeliveryStatus.Failed && !string.IsNullOrEmpty(o.DeliveryFailureReason))
+                            {
+                                <div class="muted">Lý do: @o.DeliveryFailureReason</div>
+                            }
+                        </td>
+                        <td class="row-actions">
+                            @if (trip.Status == TripStatus.OnTheWay && o.DeliveryStatus == OrderDeliveryStatus.InTrip)
+                            {
+                                <button class="btn-outline" @onclick="() => OpenMarkForm(o)">Cập nhật</button>
+                            }
+                            @if (o.DeliveryStatus == OrderDeliveryStatus.Failed)
+                            {
+                                <button class="btn-outline" @onclick="() => Requeue(o.Id)">Xếp lại chuyến mới</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@if (markingOrder is not null)
+{
+    <div class="modal-backdrop" @onclick="() => markingOrder = null">
+        <div class="modal-panel" @onclick:stopPropagation="true">
+            <h3>Cập nhật giao hàng — @markingOrder.OrderCode</h3>
+            <div class="modal-actions">
+                <button class="btn-outline" @onclick="() => SubmitMark(true)">✅ Giao thành công</button>
+                <button class="btn-danger" @onclick="() => showFailReason = true">❌ Giao thất bại</button>
+            </div>
+
+            @if (showFailReason)
+            {
+                <div class="field">
+                    <label for="fail-reason">Lý do thất bại</label>
+                    <input id="fail-reason" @bind="failureReason" placeholder="vd: Khách hẹn giao lại ngày mai" />
+                </div>
+                <div class="modal-actions">
+                    <button class="btn-outline" @onclick="() => showFailReason = false">Quay lại</button>
+                    <button class="btn-danger" disabled="@string.IsNullOrWhiteSpace(failureReason)" @onclick="() => SubmitMark(false)">Xác nhận thất bại</button>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+<style>
+    .page-header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
+    .header-actions { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
+    .btn-outline {
+        border: 1px solid var(--line-strong); color: var(--ink); background: var(--surface);
+        padding: 0.55rem 1rem; border-radius: 8px; font-weight: 600; font-size: 0.85rem; text-decoration: none;
+        display: inline-block; cursor: pointer;
+    }
+    .btn-primary {
+        background: var(--brand); color: #fff; border: none; border-radius: 8px;
+        padding: 0.6rem 1.2rem; font-weight: 600; cursor: pointer; font-size: 0.85rem;
+    }
+    .btn-danger {
+        background: var(--danger); color: #fff; border: none; border-radius: 8px;
+        padding: 0.6rem 1.2rem; font-weight: 600; cursor: pointer; font-size: 0.85rem;
+    }
+    .btn-danger:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-link { text-decoration: none; }
+    .text-right { text-align: right; }
+    .row-actions { text-align: right; white-space: nowrap; display: flex; gap: 0.4rem; justify-content: flex-end; }
+    .muted { color: var(--muted); font-size: 0.78rem; margin-top: 0.2rem; }
+
+    .channel-badge { font-size: 0.75rem; font-weight: 650; padding: 0.2rem 0.55rem; border-radius: 999px; }
+    .channel-badge.planning { background: #eef1f5; color: #475569; }
+    .channel-badge.ontheway { background: var(--brand-soft); color: var(--brand); }
+    .channel-badge.completed { background: var(--success-soft); color: var(--success); }
+    .channel-badge.pending { background: #eef1f5; color: #475569; }
+    .channel-badge.intrip { background: var(--brand-soft); color: var(--brand); }
+    .channel-badge.delivered { background: var(--success-soft); color: var(--success); }
+    .channel-badge.failed { background: var(--danger-soft); color: var(--danger); }
+
+    .modal-backdrop {
+        position: fixed; inset: 0; background: rgba(15,23,42,0.45);
+        display: flex; align-items: center; justify-content: center; padding: 1rem; z-index: 50;
+    }
+    .modal-panel {
+        background: var(--surface); border-radius: var(--radius); padding: 1.5rem;
+        width: 100%; max-width: 420px; box-shadow: var(--shadow-md);
+    }
+    .modal-panel h3 { font-size: 1.05rem; margin-bottom: 0.75rem; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 1rem; flex-wrap: wrap; }
+    .field { margin-top: 1rem; }
+    .field label { display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 0.4rem; }
+    .field input { width: 100%; padding: 0.55rem 0.7rem; border: 1px solid var(--line-strong); border-radius: 8px; font-size: 0.88rem; box-sizing: border-box; }
+</style>
+
+@code {
+    [Parameter] public string Code { get; set; } = "";
+
+    private DeliveryTrip? trip;
+    private bool notFound;
+    private string? actionError;
+    private Order? markingOrder;
+    private bool showFailReason;
+    private string failureReason = "";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await Reload();
+    }
+
+    private async Task Reload()
+    {
+        trip = null;
+        notFound = false;
+        var result = await Api.GetTripByCodeAsync(Code);
+        if (result is null) notFound = true;
+        else trip = result;
+    }
+
+    private async Task Depart()
+    {
+        actionError = null;
+        var success = await Api.DepartTripAsync(Code);
+        if (!success) { actionError = "Không thể bắt đầu chuyến giao."; return; }
+        await Reload();
+    }
+
+    private void OpenMarkForm(Order order)
+    {
+        markingOrder = order;
+        showFailReason = false;
+        failureReason = "";
+    }
+
+    private async Task SubmitMark(bool success)
+    {
+        if (markingOrder is null) return;
+        actionError = null;
+
+        var (ok, error) = await Api.MarkDeliveredAsync(Code, markingOrder.Id, new MarkDeliveredRequest
+        {
+            Success = success,
+            FailureReason = success ? null : failureReason
+        });
+
+        if (!ok) { actionError = error ?? "Không thể cập nhật trạng thái giao hàng."; return; }
+
+        markingOrder = null;
+        await Reload();
+    }
+
+    private async Task Requeue(int orderId)
+    {
+        actionError = null;
+        var success = await Api.RequeueOrderAsync(orderId);
+        if (!success) { actionError = "Không thể xếp đơn vào chuyến mới."; return; }
+        await Reload();
+    }
+
+    private static string TripStatusLabel(TripStatus s) => s switch
+    {
+        TripStatus.Planning => "Đang gom đơn",
+        TripStatus.OnTheWay => "Đang giao",
+        TripStatus.Completed => "Hoàn tất",
+        _ => s.ToString()
+    };
+
+    private static string TripBadgeClass(TripStatus s) => s switch
+    {
+        TripStatus.Planning => "planning",
+        TripStatus.OnTheWay => "ontheway",
+        TripStatus.Completed => "completed",
+        _ => ""
+    };
+
+    private static string DeliveryStatusLabel(OrderDeliveryStatus s) => s switch
+    {
+        OrderDeliveryStatus.Pending => "Chờ giao",
+        OrderDeliveryStatus.InTrip => "Đang giao",
+        OrderDeliveryStatus.Delivered => "Đã giao",
+        OrderDeliveryStatus.Failed => "Giao thất bại",
+        _ => s.ToString()
+    };
+
+    private static string DeliveryBadgeClass(OrderDeliveryStatus s) => s switch
+    {
+        OrderDeliveryStatus.Pending => "pending",
+        OrderDeliveryStatus.InTrip => "intrip",
+        OrderDeliveryStatus.Delivered => "delivered",
+        OrderDeliveryStatus.Failed => "failed",
+        _ => ""
+    };
+}

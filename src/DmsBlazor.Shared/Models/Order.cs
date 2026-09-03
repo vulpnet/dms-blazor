@@ -74,6 +74,13 @@ public class Order
     public DateTimeOffset? UpdatedAt { get; set; }
     public List<OrderLine> Lines { get; set; } = [];
     public List<OrderEditLog> EditLogs { get; set; } = [];
+
+    // Vận chuyển — độc lập với Status (Confirmed/Cancelled): 1 đơn đã Confirmed
+    // vẫn cần theo dõi riêng đã giao tới tay khách hay chưa.
+    public OrderDeliveryStatus DeliveryStatus { get; set; } = OrderDeliveryStatus.Pending;
+    public int? DeliveryTripId { get; set; }
+    public DateTimeOffset? DeliveredAt { get; set; }
+    public string? DeliveryFailureReason { get; set; }
 }
 
 /// <summary>Ghi lại mỗi lần sửa/hủy 1 đơn đã xác nhận — không cho sửa âm thầm chứng từ đã phát hành.</summary>

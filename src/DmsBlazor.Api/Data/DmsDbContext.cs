@@ -7,10 +7,11 @@ public class DmsDbContext(DbContextOptions<DmsDbContext> options) : DbContext(op
 {
     public DbSet<Distributor> Distributors => Set<Distributor>();
     public DbSet<Product> Products => Set<Product>();
-    public DbSet<Shipment> Shipments => Set<Shipment>();
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderLine> OrderLines => Set<OrderLine>();
     public DbSet<OrderEditLog> OrderEditLogs => Set<OrderEditLog>();
+    public DbSet<Driver> Drivers => Set<Driver>();
+    public DbSet<DeliveryTrip> DeliveryTrips => Set<DeliveryTrip>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -34,23 +35,29 @@ public class DmsDbContext(DbContextOptions<DmsDbContext> options) : DbContext(op
             e.Property(x => x.IsActive).HasDefaultValue(true);
         });
 
-        modelBuilder.Entity<Shipment>(e =>
+        // Sequence Postgres cho số thứ tự đơn hàng/chuyến giao — atomic ở tầng DB,
+        // an toàn khi nhiều người đặt hàng/tạo chuyến cùng lúc (không cần tự
+        // lock/đếm bằng tay ở code C#).
+        modelBuilder.HasSequence<int>("order_number_seq").StartsAt(1).IncrementsBy(1);
+        modelBuilder.HasSequence<int>("trip_number_seq").StartsAt(1).IncrementsBy(1);
+
+        modelBuilder.Entity<Driver>(e =>
         {
-            e.ToTable("shipments");
-            e.Property(x => x.Code).HasMaxLength(50).IsRequired();
-            e.HasIndex(x => x.Code).IsUnique();
-            e.Property(x => x.Distributor).HasMaxLength(200).IsRequired();
-            e.Property(x => x.Region).HasMaxLength(100).IsRequired();
-            e.Property(x => x.Driver).HasMaxLength(200);
-            e.Property(x => x.Vehicle).HasMaxLength(50);
-            // Timeline là danh sách mốc thời gian gắn chặt với 1 đơn vận chuyển,
-            // không cần tách bảng riêng — lưu dạng JSON column cho gọn.
-            e.OwnsMany(x => x.Timeline, tl => tl.ToJson());
+            e.ToTable("drivers");
+            e.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            e.Property(x => x.Phone).HasMaxLength(30);
+            e.Property(x => x.VehiclePlate).HasMaxLength(30);
         });
 
-        // Sequence Postgres cho số thứ tự đơn hàng — atomic ở tầng DB, an toàn khi
-        // nhiều người đặt hàng cùng lúc (không cần tự lock/đếm bằng tay ở code C#).
-        modelBuilder.HasSequence<int>("order_number_seq").StartsAt(1).IncrementsBy(1);
+        modelBuilder.Entity<DeliveryTrip>(e =>
+        {
+            e.ToTable("delivery_trips");
+            e.Property(x => x.TripCode).HasMaxLength(30).IsRequired();
+            e.HasIndex(x => x.TripCode).IsUnique();
+            e.Property(x => x.DriverName).HasMaxLength(200).IsRequired();
+            e.Property(x => x.VehiclePlate).HasMaxLength(30);
+            e.HasMany(x => x.Orders).WithOne().HasForeignKey(o => o.DeliveryTripId).OnDelete(DeleteBehavior.SetNull);
+        });
 
         modelBuilder.Entity<Order>(e =>
         {
@@ -61,6 +68,7 @@ public class DmsDbContext(DbContextOptions<DmsDbContext> options) : DbContext(op
             e.Property(x => x.Subtotal).HasPrecision(14, 2);
             e.Property(x => x.DiscountAmount).HasPrecision(14, 2);
             e.Property(x => x.Total).HasPrecision(14, 2);
+            e.Property(x => x.DeliveryFailureReason).HasMaxLength(500);
             e.HasMany(x => x.Lines).WithOne().HasForeignKey(l => l.OrderId).OnDelete(DeleteBehavior.Cascade);
             e.HasMany(x => x.EditLogs).WithOne().HasForeignKey(l => l.OrderId).OnDelete(DeleteBehavior.Cascade);
         });

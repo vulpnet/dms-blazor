@@ -6,10 +6,10 @@ namespace DmsBlazor.Api.Data;
 /// Dữ liệu mẫu — port từ mock-data.ts/order-data.ts/shipment-data.ts của bản demo
 /// Next.js, cùng bối cảnh FMCG (nước giải khát/thực phẩm).
 ///
-/// Distributors/Products/Shipments giờ dùng làm DỮ LIỆU SEED nạp 1 lần vào Supabase
-/// Postgres (xem DbInitializer.cs) — các controller không đọc trực tiếp từ đây nữa,
-/// mà đọc qua DmsDbContext. Riêng GetDashboard() vẫn trả trực tiếp vì Dashboard
-/// hiện là số liệu tổng hợp minh hoạ, chưa tính từ dữ liệu đơn hàng thật.
+/// Distributors/Products giờ dùng làm DỮ LIỆU SEED nạp 1 lần vào Supabase Postgres
+/// (xem DbInitializer.cs) — các controller không đọc trực tiếp từ đây nữa, mà đọc
+/// qua DmsDbContext. Riêng GetDashboard() vẫn trả trực tiếp vì Dashboard hiện là
+/// số liệu tổng hợp minh hoạ, chưa tính từ dữ liệu đơn hàng thật.
 /// </summary>
 public static class MockData
 {
@@ -94,85 +94,4 @@ public static class MockData
         }
     };
 
-    public static readonly List<Shipment> Shipments =
-    [
-        new()
-        {
-            Id = 1, Code = "VC-10231", Distributor = "NPP Hồng Phát", Region = "Miền Bắc",
-            Driver = "Trần Văn Long", Vehicle = "29H-123.45", Status = ShipmentStatus.InTransit,
-            EtaHours = 3.5, DistanceKm = 42, ProgressPercent = 55,
-            Timeline =
-            [
-                new() { Label = "Đã lấy hàng tại kho", Time = "06:10 - Hôm nay", Done = true },
-                new() { Label = "Đang vận chuyển", Time = "06:45 - Hôm nay", Done = true },
-                new() { Label = "Đang giao hàng", Time = "Dự kiến 10:30", Done = false },
-                new() { Label = "Đã giao", Time = "Dự kiến 11:00", Done = false },
-            ]
-        },
-        new()
-        {
-            Id = 2, Code = "VC-10232", Distributor = "NPP Đại Thành", Region = "Miền Bắc",
-            Driver = "Nguyễn Thị Hoa", Vehicle = "29C-678.90", Status = ShipmentStatus.OutForDelivery,
-            EtaHours = 0.8, DistanceKm = 18, ProgressPercent = 88,
-            Timeline =
-            [
-                new() { Label = "Đã lấy hàng tại kho", Time = "07:00 - Hôm nay", Done = true },
-                new() { Label = "Đang vận chuyển", Time = "07:20 - Hôm nay", Done = true },
-                new() { Label = "Đang giao hàng", Time = "09:40 - Hôm nay", Done = true },
-                new() { Label = "Đã giao", Time = "Dự kiến 10:20", Done = false },
-            ]
-        },
-        new()
-        {
-            Id = 3, Code = "VC-10233", Distributor = "NPP Miền Trung Phát", Region = "Miền Trung",
-            Driver = "Lê Văn Sơn", Vehicle = "43B-111.22", Status = ShipmentStatus.Delayed,
-            EtaHours = -1.2, DistanceKm = 65, ProgressPercent = 70,
-            Timeline =
-            [
-                new() { Label = "Đã lấy hàng tại kho", Time = "05:30 - Hôm nay", Done = true },
-                new() { Label = "Đang vận chuyển", Time = "06:00 - Hôm nay", Done = true },
-                new() { Label = "Đang giao hàng", Time = "09:00 - Hôm nay", Done = true, Delayed = true },
-                new() { Label = "Đã giao", Time = "Trễ so với dự kiến 08:30", Done = false, Delayed = true },
-            ]
-        },
-        new()
-        {
-            Id = 4, Code = "VC-10234", Distributor = "NPP Sông Hàn", Region = "Miền Trung",
-            Driver = "Phạm Thị Lan", Vehicle = "43H-333.44", Status = ShipmentStatus.PickedUp,
-            EtaHours = 6, DistanceKm = 80, ProgressPercent = 10,
-            Timeline =
-            [
-                new() { Label = "Đã lấy hàng tại kho", Time = "08:15 - Hôm nay", Done = true },
-                new() { Label = "Đang vận chuyển", Time = "Dự kiến 08:30", Done = false },
-                new() { Label = "Đang giao hàng", Time = "Dự kiến 13:00", Done = false },
-                new() { Label = "Đã giao", Time = "Dự kiến 14:15", Done = false },
-            ]
-        },
-        new()
-        {
-            Id = 5, Code = "VC-10235", Distributor = "NPP Phương Nam", Region = "Miền Nam",
-            Driver = "Đỗ Văn Khoa", Vehicle = "51C-555.66", Status = ShipmentStatus.Delivered,
-            EtaHours = 0, DistanceKm = 35, ProgressPercent = 100,
-            Timeline =
-            [
-                new() { Label = "Đã lấy hàng tại kho", Time = "05:00 - Hôm nay", Done = true },
-                new() { Label = "Đang vận chuyển", Time = "05:20 - Hôm nay", Done = true },
-                new() { Label = "Đang giao hàng", Time = "07:45 - Hôm nay", Done = true },
-                new() { Label = "Đã giao", Time = "08:30 - Hôm nay", Done = true },
-            ]
-        },
-        new()
-        {
-            Id = 6, Code = "VC-10236", Distributor = "NPP Cửu Long", Region = "Miền Nam",
-            Driver = "Hoàng Minh Tuấn", Vehicle = "51D-777.88", Status = ShipmentStatus.InTransit,
-            EtaHours = 4.2, DistanceKm = 55, ProgressPercent = 40,
-            Timeline =
-            [
-                new() { Label = "Đã lấy hàng tại kho", Time = "07:30 - Hôm nay", Done = true },
-                new() { Label = "Đang vận chuyển", Time = "07:50 - Hôm nay", Done = true },
-                new() { Label = "Đang giao hàng", Time = "Dự kiến 12:00", Done = false },
-                new() { Label = "Đã giao", Time = "Dự kiến 12:30", Done = false },
-            ]
-        },
-    ];
 }

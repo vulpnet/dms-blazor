@@ -48,13 +48,64 @@ public class DmsApiClient(HttpClient http)
         return res.IsSuccessStatusCode;
     }
 
-    public Task<List<Shipment>?> GetShipmentsAsync(ShipmentStatus? status = null, string? region = null)
+    // ===== Vận chuyển: tài xế + chuyến giao hàng =====
+
+    public Task<List<Driver>?> GetDriversAsync(bool includeInactive = false) =>
+        http.GetFromJsonAsync<List<Driver>>($"api/drivers?includeInactive={includeInactive}");
+
+    public async Task<(bool Success, string? Error)> CreateDriverAsync(CreateDriverRequest request)
     {
-        var query = new List<string>();
-        if (status.HasValue) query.Add($"status={status}");
-        if (!string.IsNullOrWhiteSpace(region)) query.Add($"region={Uri.EscapeDataString(region)}");
-        var qs = query.Count > 0 ? "?" + string.Join("&", query) : "";
-        return http.GetFromJsonAsync<List<Shipment>>($"api/shipments{qs}");
+        var res = await http.PostAsJsonAsync("api/drivers", request);
+        if (res.IsSuccessStatusCode) return (true, null);
+        return (false, await res.Content.ReadAsStringAsync());
+    }
+
+    public async Task<(bool Success, string? Error)> UpdateDriverAsync(int id, CreateDriverRequest request)
+    {
+        var res = await http.PutAsJsonAsync($"api/drivers/{id}", request);
+        if (res.IsSuccessStatusCode) return (true, null);
+        return (false, await res.Content.ReadAsStringAsync());
+    }
+
+    public async Task<bool> DeactivateDriverAsync(int id)
+    {
+        var res = await http.PostAsync($"api/drivers/{id}/deactivate", null);
+        return res.IsSuccessStatusCode;
+    }
+
+    public Task<List<DeliveryTrip>?> GetTripsAsync() =>
+        http.GetFromJsonAsync<List<DeliveryTrip>>("api/deliverytrips");
+
+    public Task<DeliveryTrip?> GetTripByCodeAsync(string code) =>
+        http.GetFromJsonAsync<DeliveryTrip>($"api/deliverytrips/{code}");
+
+    public Task<List<Order>?> GetPendingOrdersAsync() =>
+        http.GetFromJsonAsync<List<Order>>("api/deliverytrips/pending-orders");
+
+    public async Task<(bool Success, string? Error)> CreateTripAsync(CreateTripRequest request)
+    {
+        var res = await http.PostAsJsonAsync("api/deliverytrips", request);
+        if (res.IsSuccessStatusCode) return (true, null);
+        return (false, await res.Content.ReadAsStringAsync());
+    }
+
+    public async Task<bool> DepartTripAsync(string code)
+    {
+        var res = await http.PostAsync($"api/deliverytrips/{code}/depart", null);
+        return res.IsSuccessStatusCode;
+    }
+
+    public async Task<(bool Success, string? Error)> MarkDeliveredAsync(string tripCode, int orderId, MarkDeliveredRequest request)
+    {
+        var res = await http.PostAsJsonAsync($"api/deliverytrips/{tripCode}/orders/{orderId}/mark-delivered", request);
+        if (res.IsSuccessStatusCode) return (true, null);
+        return (false, await res.Content.ReadAsStringAsync());
+    }
+
+    public async Task<bool> RequeueOrderAsync(int orderId)
+    {
+        var res = await http.PostAsync($"api/deliverytrips/orders/{orderId}/requeue", null);
+        return res.IsSuccessStatusCode;
     }
 
     // ===== Quản lý sản phẩm (CRUD) =====

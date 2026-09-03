@@ -41,23 +41,6 @@ public static class DbInitializer
             }));
         }
 
-        if (!await db.Shipments.AnyAsync())
-        {
-            db.Shipments.AddRange(MockData.Shipments.Select(s => new Shared.Models.Shipment
-            {
-                Code = s.Code,
-                Distributor = s.Distributor,
-                Region = s.Region,
-                Driver = s.Driver,
-                Vehicle = s.Vehicle,
-                Status = s.Status,
-                EtaHours = s.EtaHours,
-                DistanceKm = s.DistanceKm,
-                ProgressPercent = s.ProgressPercent,
-                Timeline = s.Timeline
-            }));
-        }
-
         await db.SaveChangesAsync();
     }
 }

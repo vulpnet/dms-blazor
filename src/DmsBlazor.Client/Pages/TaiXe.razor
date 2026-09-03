@@ -1,0 +1,163 @@
+@page "/tai-xe"
+@using DmsBlazor.Shared.Models
+@using DmsBlazor.Client.Services
+@inject DmsApiClient Api
+
+<PageTitle>Tài xế — DMS</PageTitle>
+
+<div class="page-header page-header-row">
+    <div>
+        <h1>Tài xế &amp; phương tiện</h1>
+        <p>Danh sách tài xế dùng để gán vào chuyến giao hàng.</p>
+    </div>
+    <button class="btn-primary" @onclick="OpenCreateForm">+ Thêm tài xế</button>
+</div>
+
+@if (editing is not null)
+{
+    <div class="card form-card">
+        <h3>@(editing.Id == 0 ? "Thêm tài xế mới" : "Sửa thông tin tài xế")</h3>
+        <div class="form-grid">
+            <div class="field">
+                <label for="d-name">Họ tên</label>
+                <input id="d-name" @bind="editing.Name" />
+            </div>
+            <div class="field">
+                <label for="d-phone">Điện thoại</label>
+                <input id="d-phone" @bind="editing.Phone" />
+            </div>
+            <div class="field">
+                <label for="d-plate">Biển số xe</label>
+                <input id="d-plate" @bind="editing.VehiclePlate" />
+            </div>
+        </div>
+
+        @if (formError is not null)
+        {
+            <div class="alert-error">@formError</div>
+        }
+
+        <div class="modal-actions">
+            <button class="btn-outline" @onclick="() => editing = null">Huỷ bỏ</button>
+            <button class="btn-primary" disabled="@saving" @onclick="Save">@(saving ? "Đang lưu..." : "Lưu")</button>
+        </div>
+    </div>
+}
+
+@if (drivers is null)
+{
+    <div class="skeleton-row"><div class="skeleton-card"></div></div>
+}
+else if (drivers.Count == 0)
+{
+    <p class="muted">Chưa có tài xế nào.</p>
+}
+else
+{
+    <div class="card">
+        <table class="data-table">
+            <thead>
+                <tr><th>Họ tên</th><th>Điện thoại</th><th>Biển số xe</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var d in drivers)
+                {
+                    <tr>
+                        <td>@d.Name</td>
+                        <td>@d.Phone</td>
+                        <td>@d.VehiclePlate</td>
+                        <td class="row-actions">
+                            <button class="btn-link" @onclick="() => OpenEditForm(d)">Sửa</button>
+                            <button class="btn-link danger" @onclick="() => Deactivate(d.Id)">Ngừng hoạt động</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+<style>
+    .page-header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
+    .btn-primary {
+        background: var(--brand); color: #fff; border: none; border-radius: 8px;
+        padding: 0.6rem 1.2rem; font-weight: 600; cursor: pointer; font-size: 0.85rem;
+    }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-outline {
+        border: 1px solid var(--line-strong); color: var(--ink); background: var(--surface);
+        padding: 0.55rem 1rem; border-radius: 8px; font-weight: 600; font-size: 0.85rem; cursor: pointer;
+    }
+    .btn-link { border: none; background: transparent; color: var(--brand); font-weight: 600; font-size: 0.83rem; cursor: pointer; }
+    .btn-link.danger { color: var(--danger); }
+    .row-actions { text-align: right; white-space: nowrap; display: flex; gap: 0.6rem; justify-content: flex-end; }
+    .muted { color: var(--muted); font-size: 0.85rem; }
+
+    .form-card { margin-bottom: 1.5rem; }
+    .form-card h3 { margin-bottom: 1rem; }
+    .form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+    @@media (max-width: 700px) {
+        .form-grid { grid-template-columns: 1fr; }
+    }
+    .field label { display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 0.4rem; }
+    .field input { width: 100%; padding: 0.55rem 0.7rem; border: 1px solid var(--line-strong); border-radius: 8px; font-size: 0.88rem; box-sizing: border-box; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 1.25rem; }
+</style>
+
+@code {
+    private List<Driver>? drivers;
+    private Driver? editing;
+    private bool saving;
+    private string? formError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Reload();
+    }
+
+    private async Task Reload() => drivers = await Api.GetDriversAsync();
+
+    private void OpenCreateForm()
+    {
+        formError = null;
+        editing = new Driver();
+    }
+
+    private void OpenEditForm(Driver d)
+    {
+        formError = null;
+        editing = new Driver { Id = d.Id, Name = d.Name, Phone = d.Phone, VehiclePlate = d.VehiclePlate };
+    }
+
+    private async Task Save()
+    {
+        if (editing is null) return;
+        if (string.IsNullOrWhiteSpace(editing.Name))
+        {
+            formError = "Vui lòng nhập họ tên.";
+            return;
+        }
+
+        saving = true;
+        var request = new CreateDriverRequest { Name = editing.Name, Phone = editing.Phone, VehiclePlate = editing.VehiclePlate };
+        var (success, error) = editing.Id == 0
+            ? await Api.CreateDriverAsync(request)
+            : await Api.UpdateDriverAsync(editing.Id, request);
+        saving = false;
+
+        if (!success)
+        {
+            formError = error ?? "Không thể lưu tài xế.";
+            return;
+        }
+
+        editing = null;
+        await Reload();
+    }
+
+    private async Task Deactivate(int id)
+    {
+        await Api.DeactivateDriverAsync(id);
+        await Reload();
+    }
+}
