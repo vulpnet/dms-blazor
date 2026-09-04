@@ -111,23 +111,77 @@ public class SalesRoutesController(DmsDbContext db) : ControllerBase
         var orderedCustomerNames = ordersToday.Where(o => o.CustomerName != null).Select(o => o.CustomerName).ToHashSet();
         var orderedDistributorNames = ordersToday.Where(o => o.DistributorName != null).Select(o => o.DistributorName).ToHashSet();
 
-        var result = stopsToday.Select(x => new TodayStop
+        var todayDate = DateOnly.FromDateTime(vnNow.Date);
+        var stopIds = stopsToday.Select(x => x.Stop.Id).ToList();
+        var visitLogsToday = await db.RouteVisitLogs
+            .Where(v => stopIds.Contains(v.RouteStopId) && v.VisitDate == todayDate)
+            .ToDictionaryAsync(v => v.RouteStopId);
+
+        var result = stopsToday.Select(x =>
         {
-            RouteStopId = x.Stop.Id,
-            RouteCode = x.Route.RouteCode,
-            RouteName = x.Route.Name,
-            SortOrder = x.Stop.SortOrder,
-            StopType = x.Stop.StopType,
-            TargetId = x.Stop.StopType == StopType.Customer ? x.Stop.CustomerId ?? 0 : x.Stop.DistributorId ?? 0,
-            StopName = x.Stop.StopName,
-            HasOrderToday = x.Stop.StopType == StopType.Customer
+            var hasOrder = x.Stop.StopType == StopType.Customer
                 ? orderedCustomerNames.Contains(x.Stop.StopName)
-                : orderedDistributorNames.Contains(x.Stop.StopName)
+                : orderedDistributorNames.Contains(x.Stop.StopName);
+            var visitLog = visitLogsToday.GetValueOrDefault(x.Stop.Id);
+
+            // "Đã đặt đơn" luôn ưu tiên cao nhất — đơn hàng là bằng chứng mạnh hơn
+            // tự khai đã ghé, bất kể có log ghé thăm hay không.
+            var status = hasOrder ? VisitStatus.Ordered
+                : visitLog is not null ? VisitStatus.VisitedNoOrder
+                : VisitStatus.NotVisited;
+
+            return new TodayStop
+            {
+                RouteStopId = x.Stop.Id,
+                RouteCode = x.Route.RouteCode,
+                RouteName = x.Route.Name,
+                SortOrder = x.Stop.SortOrder,
+                StopType = x.Stop.StopType,
+                TargetId = x.Stop.StopType == StopType.Customer ? x.Stop.CustomerId ?? 0 : x.Stop.DistributorId ?? 0,
+                StopName = x.Stop.StopName,
+                Status = status,
+                VisitNote = visitLog?.Note
+            };
         })
         .OrderBy(x => x.RouteCode).ThenBy(x => x.SortOrder)
         .ToList();
 
         return result;
+    }
+
+    // NVBH tự đánh dấu đã ghé thăm 1 điểm dừng hôm nay dù không phát sinh đơn hàng.
+    // Không cho đánh dấu nếu điểm đó đã "Ordered" — đặt hàng là bằng chứng mạnh hơn,
+    // không cần (và không nên) hạ xuống trạng thái yếu hơn.
+    [HttpPost("stops/{routeStopId:int}/mark-visited")]
+    public async Task<IActionResult> MarkVisited(int routeStopId, [FromBody] MarkVisitedRequest request)
+    {
+        var stop = await db.RouteStops.FindAsync(routeStopId);
+        if (stop is null) return NotFound();
+
+        var utcNow = DateTimeOffset.UtcNow;
+        var todayDate = DateOnly.FromDateTime(utcNow.ToOffset(TimeSpan.FromHours(7)).Date);
+
+        var existing = await db.RouteVisitLogs
+            .FirstOrDefaultAsync(v => v.RouteStopId == routeStopId && v.VisitDate == todayDate);
+
+        if (existing is not null)
+        {
+            existing.Note = request.Note?.Trim();
+            existing.VisitedAt = utcNow;
+        }
+        else
+        {
+            db.RouteVisitLogs.Add(new RouteVisitLog
+            {
+                RouteStopId = routeStopId,
+                VisitDate = todayDate,
+                VisitedAt = utcNow, // Npgsql chỉ chấp nhận DateTimeOffset offset=0 (UTC) cho cột timestamptz
+                Note = request.Note?.Trim()
+            });
+        }
+
+        await db.SaveChangesAsync();
+        return NoContent();
     }
 
     private async Task<(List<RouteStop> Stops, string? Error)> BuildStopsAsync(List<RouteStopInput> inputs)

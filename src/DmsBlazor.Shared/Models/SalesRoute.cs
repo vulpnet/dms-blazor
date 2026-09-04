@@ -70,8 +70,36 @@ public class SaveRouteRequest
     public List<RouteStopInput> Stops { get; set; } = [];
 }
 
-/// <summary>1 dòng trong lịch hôm nay — điểm dừng kèm trạng thái đã đặt đơn hay chưa
-/// (dựa trên có đơn hàng nào tạo trong ngày cho đúng khách/NPP đó hay không).</summary>
+public enum VisitStatus
+{
+    NotVisited,    // Chưa ghé
+    VisitedNoOrder, // Đã ghé, không đặt — NVBH tự đánh dấu
+    Ordered        // Đã đặt đơn — tự động suy ra từ đơn hàng tạo trong ngày, ưu tiên cao nhất
+}
+
+/// <summary>
+/// Ghi lại việc NVBH ghé thăm 1 điểm dừng trong 1 ngày cụ thể — kể cả khi không phát
+/// sinh đơn hàng. VisitDate không có giờ vì mỗi điểm dừng chỉ ghi 1 log/ngày (unique
+/// theo RouteStopId+VisitDate). Trạng thái "Ordered" KHÔNG lưu ở đây — luôn suy ra
+/// trực tiếp từ bảng Orders khi đọc, để không bao giờ lệch giữa 2 nguồn dữ liệu.
+/// </summary>
+public class RouteVisitLog
+{
+    public int Id { get; set; }
+    public int RouteStopId { get; set; }
+    public DateOnly VisitDate { get; set; }
+    public DateTimeOffset VisitedAt { get; set; }
+    public string? Note { get; set; }
+}
+
+public class MarkVisitedRequest
+{
+    public string? Note { get; set; }
+}
+
+/// <summary>1 dòng trong lịch hôm nay — điểm dừng kèm trạng thái 3 mức: Chưa ghé /
+/// Đã ghé không đặt (NVBH tự đánh dấu) / Đã đặt đơn (tự động, ưu tiên cao nhất —
+/// có đơn hàng là bằng chứng mạnh hơn tự khai đã ghé).</summary>
 public class TodayStop
 {
     public int RouteStopId { get; set; }
@@ -81,5 +109,6 @@ public class TodayStop
     public StopType StopType { get; set; }
     public int TargetId { get; set; }
     public string StopName { get; set; } = "";
-    public bool HasOrderToday { get; set; }
+    public VisitStatus Status { get; set; }
+    public string? VisitNote { get; set; }
 }

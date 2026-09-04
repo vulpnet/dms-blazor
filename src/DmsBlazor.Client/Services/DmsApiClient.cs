@@ -239,4 +239,10 @@ public class DmsApiClient(HttpClient http)
 
     public Task<List<TodayStop>?> GetTodayStopsAsync(int salesRepId) =>
         http.GetFromJsonAsync<List<TodayStop>>($"api/salesroutes/today/{salesRepId}");
+
+    public async Task<bool> MarkVisitedAsync(int routeStopId, MarkVisitedRequest request)
+    {
+        var res = await http.PostAsJsonAsync($"api/salesroutes/stops/{routeStopId}/mark-visited", request);
+        return res.IsSuccessStatusCode;
+    }
 }

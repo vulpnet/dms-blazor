@@ -16,6 +16,7 @@ public class DmsDbContext(DbContextOptions<DmsDbContext> options) : DbContext(op
     public DbSet<SalesRep> SalesReps => Set<SalesRep>();
     public DbSet<SalesRoute> SalesRoutes => Set<SalesRoute>();
     public DbSet<RouteStop> RouteStops => Set<RouteStop>();
+    public DbSet<RouteVisitLog> RouteVisitLogs => Set<RouteVisitLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -133,6 +134,15 @@ public class DmsDbContext(DbContextOptions<DmsDbContext> options) : DbContext(op
         {
             e.ToTable("route_stops");
             e.Property(x => x.StopName).HasMaxLength(200).IsRequired();
+        });
+
+        modelBuilder.Entity<RouteVisitLog>(e =>
+        {
+            e.ToTable("route_visit_logs");
+            e.Property(x => x.Note).HasMaxLength(500);
+            // 1 điểm dừng chỉ ghi 1 log/ngày — bấm "Đánh dấu đã ghé" lần 2 trong
+            // cùng ngày là cập nhật lại log cũ, không tạo bản ghi trùng.
+            e.HasIndex(x => new { x.RouteStopId, x.VisitDate }).IsUnique();
         });
     }
 }
