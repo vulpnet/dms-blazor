@@ -9,6 +9,9 @@ public class DmsApiClient(HttpClient http)
     public Task<List<Distributor>?> GetDistributorsAsync() =>
         http.GetFromJsonAsync<List<Distributor>>("api/catalog/distributors");
 
+    public Task<List<Customer>?> GetCustomersAsync() =>
+        http.GetFromJsonAsync<List<Customer>>("api/catalog/customers");
+
     public Task<List<Product>?> GetProductsAsync() =>
         http.GetFromJsonAsync<List<Product>>("api/catalog/products");
 
@@ -130,6 +133,56 @@ public class DmsApiClient(HttpClient http)
     public async Task<bool> DeleteProductAsync(int id)
     {
         var res = await http.DeleteAsync($"api/products/{id}");
+        return res.IsSuccessStatusCode;
+    }
+
+    // ===== Quản lý khách hàng (CRUD) =====
+
+    public Task<List<Customer>?> GetManagedCustomersAsync() =>
+        http.GetFromJsonAsync<List<Customer>>("api/customers");
+
+    public async Task<(bool Success, string? Error)> CreateCustomerAsync(Customer customer)
+    {
+        var res = await http.PostAsJsonAsync("api/customers", customer);
+        if (res.IsSuccessStatusCode) return (true, null);
+        return (false, await res.Content.ReadAsStringAsync());
+    }
+
+    public async Task<(bool Success, string? Error)> UpdateCustomerAsync(int id, Customer customer)
+    {
+        var res = await http.PutAsJsonAsync($"api/customers/{id}", customer);
+        if (res.IsSuccessStatusCode) return (true, null);
+        return (false, await res.Content.ReadAsStringAsync());
+    }
+
+    public async Task<bool> DeleteCustomerAsync(int id)
+    {
+        var res = await http.DeleteAsync($"api/customers/{id}");
+        return res.IsSuccessStatusCode;
+    }
+
+    // ===== Quản lý nhà phân phối (CRUD) =====
+
+    public Task<List<Distributor>?> GetManagedDistributorsAsync() =>
+        http.GetFromJsonAsync<List<Distributor>>("api/distributors");
+
+    public async Task<(bool Success, string? Error)> CreateDistributorAsync(Distributor distributor)
+    {
+        var res = await http.PostAsJsonAsync("api/distributors", distributor);
+        if (res.IsSuccessStatusCode) return (true, null);
+        return (false, await res.Content.ReadAsStringAsync());
+    }
+
+    public async Task<(bool Success, string? Error)> UpdateDistributorAsync(int id, Distributor distributor)
+    {
+        var res = await http.PutAsJsonAsync($"api/distributors/{id}", distributor);
+        if (res.IsSuccessStatusCode) return (true, null);
+        return (false, await res.Content.ReadAsStringAsync());
+    }
+
+    public async Task<bool> DeleteDistributorAsync(int id)
+    {
+        var res = await http.DeleteAsync($"api/distributors/{id}");
         return res.IsSuccessStatusCode;
     }
 }

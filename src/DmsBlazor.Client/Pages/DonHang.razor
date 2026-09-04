@@ -34,7 +34,7 @@ else
                     <th>Mã đơn</th>
                     <th>Ngày đặt</th>
                     <th>Kênh</th>
-                    <th>Nhà phân phối</th>
+                    <th>Đối tác</th>
                     <th class="text-right">Số lượng</th>
                     <th class="text-right">Tổng tiền</th>
                     <th>Trạng thái</th>
@@ -53,7 +53,7 @@ else
                                 @(o.Channel == SalesChannel.Npp ? "NPP" : "Bán lẻ")
                             </span>
                         </td>
-                        <td>@(o.DistributorName ?? "—")</td>
+                        <td>@(o.DistributorName ?? o.CustomerName ?? "—")</td>
                         <td class="text-right">@o.TotalQty</td>
                         <td class="text-right">@o.Total.ToString("N0")k</td>
                         <td>

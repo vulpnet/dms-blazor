@@ -1,0 +1,279 @@
+@page "/khach-hang"
+@using System.ComponentModel.DataAnnotations
+@using DmsBlazor.Shared.Models
+@using DmsBlazor.Client.Services
+@inject DmsApiClient Api
+
+<PageTitle>Quản lý khách hàng — DMS</PageTitle>
+
+<div class="page-header page-header-row">
+    <div>
+        <h1>Quản lý khách hàng</h1>
+        <p>Khách lẻ (cửa hàng/điểm bán) mua qua kênh bán lẻ — dùng để chọn khi đặt hàng.</p>
+    </div>
+    <button class="btn-primary" @onclick="OpenCreateForm">+ Thêm khách hàng</button>
+</div>
+
+@if (errorMessage is not null)
+{
+    <div class="alert-error">@errorMessage</div>
+}
+
+@if (customers is null)
+{
+    <div class="skeleton-row"><div class="skeleton-card"></div></div>
+}
+else if (customers.Count == 0)
+{
+    <p class="muted">Chưa có khách hàng nào. Bấm "Thêm khách hàng" để bắt đầu.</p>
+}
+else
+{
+    <div class="card">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Tên khách hàng</th>
+                    <th>Điện thoại</th>
+                    <th>Địa chỉ</th>
+                    <th>Đang hoạt động</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var c in customers)
+                {
+                    <tr class="@(c.IsActive ? "" : "row-inactive")">
+                        <td>@c.Name</td>
+                        <td>@c.Phone</td>
+                        <td>@c.Address</td>
+                        <td>
+                            <label class="toggle">
+                                <input type="checkbox" checked="@c.IsActive" @onchange="e => ToggleActive(c, (bool)e.Value!)" />
+                                <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                            </label>
+                        </td>
+                        <td class="row-actions">
+                            <button class="btn-link" @onclick="() => OpenEditForm(c)">Sửa</button>
+                            <button class="btn-link danger" @onclick="() => ConfirmDelete(c)">Xoá</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@if (showForm)
+{
+    <div class="modal-backdrop" @onclick="CloseForm">
+        <div class="modal-panel" @onclick:stopPropagation="true">
+            <h3>@(editingId is null ? "Thêm khách hàng" : "Sửa khách hàng")</h3>
+
+            <EditForm Model="formModel" OnValidSubmit="SaveCustomer">
+                <DataAnnotationsValidator />
+
+                <div class="field">
+                    <label for="f-name">Tên khách hàng</label>
+                    <InputText id="f-name" @bind-Value="formModel.Name" placeholder="vd: Tạp hoá Cô Ba" />
+                </div>
+                <div class="field">
+                    <label for="f-phone">Điện thoại</label>
+                    <InputText id="f-phone" @bind-Value="formModel.Phone" placeholder="vd: 0901234567" />
+                </div>
+                <div class="field">
+                    <label for="f-address">Địa chỉ</label>
+                    <InputText id="f-address" @bind-Value="formModel.Address" placeholder="vd: 12 Lê Lợi, Q1, TP.HCM" />
+                </div>
+
+                <div class="field field-checkbox">
+                    <label>
+                        <InputCheckbox @bind-Value="formModel.IsActive" />
+                        Đang hoạt động (hiện ở màn hình đặt hàng)
+                    </label>
+                </div>
+
+                @if (formError is not null)
+                {
+                    <div class="alert-error">@formError</div>
+                }
+
+                <div class="modal-actions">
+                    <button type="button" class="btn-outline" @onclick="CloseForm">Huỷ</button>
+                    <button type="submit" class="btn-primary" disabled="@saving">
+                        @(saving ? "Đang lưu..." : "Lưu")
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@if (confirmingDelete is not null)
+{
+    <div class="modal-backdrop" @onclick="() => confirmingDelete = null">
+        <div class="modal-panel modal-panel-sm" @onclick:stopPropagation="true">
+            <h3>Xoá khách hàng?</h3>
+            <p class="muted">Khách hàng <b>@confirmingDelete.Name</b> sẽ bị xoá vĩnh viễn. Đơn hàng cũ đã đặt vẫn giữ nguyên (lưu snapshot tên/SĐT).</p>
+            <div class="modal-actions">
+                <button class="btn-outline" @onclick="() => confirmingDelete = null">Huỷ</button>
+                <button class="btn-danger" @onclick="DeleteCustomer">Xoá</button>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .page-header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
+    .row-actions { white-space: nowrap; text-align: right; }
+    .row-inactive { opacity: 0.55; }
+    .btn-link {
+        background: none; border: none; cursor: pointer;
+        color: var(--brand); font-weight: 600; font-size: 0.83rem;
+        padding: 0.2rem 0.4rem;
+    }
+    .btn-link.danger { color: var(--danger); }
+    .btn-link:hover { text-decoration: underline; }
+    .muted { color: var(--muted); font-size: 0.85rem; }
+
+    .modal-backdrop {
+        position: fixed; inset: 0;
+        background: rgba(15, 23, 42, 0.45);
+        display: flex; align-items: center; justify-content: center;
+        padding: 1rem;
+        z-index: 50;
+    }
+    .modal-panel {
+        background: var(--surface);
+        border-radius: var(--radius);
+        padding: 1.5rem;
+        width: 100%;
+        max-width: 420px;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: var(--shadow-md);
+    }
+    .modal-panel-sm { max-width: 380px; }
+    .modal-panel h3 { font-size: 1.05rem; margin-bottom: 1rem; }
+    .field { margin-bottom: 1rem; }
+    .field label { display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 0.35rem; }
+    .field input {
+        width: 100%;
+        padding: 0.55rem 0.7rem;
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        font-size: 0.88rem;
+    }
+    .field-checkbox label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.88rem; font-weight: 500; color: var(--ink); cursor: pointer; }
+    .field-checkbox input { width: auto !important; accent-color: var(--brand); }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 1.25rem; }
+    .btn-danger {
+        background: var(--danger); color: #fff; border: none;
+        border-radius: 8px; padding: 0.6rem 1.2rem; font-weight: 600; cursor: pointer; font-size: 0.88rem;
+    }
+</style>
+
+@code {
+    private List<Customer>? customers;
+    private string? errorMessage;
+
+    private bool showForm;
+    private int? editingId;
+    private CustomerFormModel formModel = new();
+    private string? formError;
+    private bool saving;
+
+    private Customer? confirmingDelete;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCustomers();
+    }
+
+    private async Task LoadCustomers()
+    {
+        try
+        {
+            customers = await Api.GetManagedCustomersAsync();
+        }
+        catch
+        {
+            errorMessage = "Không tải được danh sách khách hàng. Kiểm tra kết nối tới máy chủ.";
+        }
+    }
+
+    private void OpenCreateForm()
+    {
+        editingId = null;
+        formModel = new CustomerFormModel();
+        formError = null;
+        showForm = true;
+    }
+
+    private void OpenEditForm(Customer c)
+    {
+        editingId = c.Id;
+        formModel = new CustomerFormModel { Name = c.Name, Phone = c.Phone, Address = c.Address, IsActive = c.IsActive };
+        formError = null;
+        showForm = true;
+    }
+
+    private void CloseForm() => showForm = false;
+
+    private async Task SaveCustomer()
+    {
+        saving = true;
+        formError = null;
+
+        var customer = new Customer
+        {
+            Name = formModel.Name.Trim(),
+            Phone = formModel.Phone.Trim(),
+            Address = formModel.Address.Trim(),
+            IsActive = formModel.IsActive
+        };
+
+        var (success, error) = editingId is null
+            ? await Api.CreateCustomerAsync(customer)
+            : await Api.UpdateCustomerAsync(editingId.Value, customer);
+
+        saving = false;
+
+        if (!success)
+        {
+            formError = error ?? "Lưu không thành công.";
+            return;
+        }
+
+        showForm = false;
+        await LoadCustomers();
+    }
+
+    private async Task ToggleActive(Customer c, bool isActive)
+    {
+        c.IsActive = isActive;
+        var updated = new Customer { Name = c.Name, Phone = c.Phone, Address = c.Address, IsActive = isActive };
+        var (success, _) = await Api.UpdateCustomerAsync(c.Id, updated);
+        if (!success) await LoadCustomers();
+    }
+
+    private void ConfirmDelete(Customer c) => confirmingDelete = c;
+
+    private async Task DeleteCustomer()
+    {
+        if (confirmingDelete is null) return;
+        await Api.DeleteCustomerAsync(confirmingDelete.Id);
+        confirmingDelete = null;
+        await LoadCustomers();
+    }
+
+    public class CustomerFormModel
+    {
+        [Required(ErrorMessage = "Bắt buộc nhập tên khách hàng")]
+        public string Name { get; set; } = "";
+
+        public string Phone { get; set; } = "";
+        public string Address { get; set; } = "";
+        public bool IsActive { get; set; } = true;
+    }
+}

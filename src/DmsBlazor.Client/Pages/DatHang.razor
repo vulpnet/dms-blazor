@@ -11,7 +11,7 @@
     <p>Chọn từng sản phẩm và số lượng, thêm vào giỏ hàng — hệ thống tự tính chiết khấu và tặng kèm.</p>
 </div>
 
-@if (products is null || distributors is null)
+@if (products is null || distributors is null || customers is null)
 {
     <div class="skeleton-row">
         <div class="skeleton-card"></div>
@@ -29,15 +29,41 @@ else
         <div class="order-products">
             @if (channel == SalesChannel.Npp)
             {
-                <div class="field">
-                    <label for="distributor-select">Tạo đơn cho nhà phân phối</label>
-                    <select id="distributor-select" @bind="selectedDistributorId">
-                        @foreach (var d in distributors)
-                        {
-                            <option value="@d.Id">@d.Name</option>
-                        }
-                    </select>
-                </div>
+                @if (distributors.Count == 0)
+                {
+                    <p class="muted">Chưa có nhà phân phối nào đang hợp tác — <a href="/nha-phan-phoi">thêm nhà phân phối</a> trước khi đặt đơn kênh này.</p>
+                }
+                else
+                {
+                    <div class="field">
+                        <label for="distributor-select">Tạo đơn cho nhà phân phối</label>
+                        <select id="distributor-select" @bind="selectedDistributorId">
+                            @foreach (var d in distributors)
+                            {
+                                <option value="@d.Id">@d.Name</option>
+                            }
+                        </select>
+                    </div>
+                }
+            }
+            else
+            {
+                @if (customers.Count == 0)
+                {
+                    <p class="muted">Chưa có khách hàng nào đang hoạt động — <a href="/khach-hang">thêm khách hàng</a> trước khi đặt đơn kênh này.</p>
+                }
+                else
+                {
+                    <div class="field">
+                        <label for="customer-select">Đặt hàng cho khách hàng</label>
+                        <select id="customer-select" @bind="selectedCustomerId">
+                            @foreach (var c in customers)
+                            {
+                                <option value="@c.Id">@c.Name</option>
+                            }
+                        </select>
+                    </div>
+                }
             }
 
             <div class="card picker-card">
@@ -224,8 +250,10 @@ else
 @code {
     private List<Product>? products;
     private List<Distributor>? distributors;
+    private List<Customer>? customers;
     private SalesChannel channel = SalesChannel.Npp;
     private int selectedDistributorId;
+    private int selectedCustomerId;
     private int selectedProductId;
     private int quantityToAdd = 1;
     private readonly Dictionary<int, int> cart = [];
@@ -245,7 +273,9 @@ else
     {
         products = await Api.GetProductsAsync();
         distributors = await Api.GetDistributorsAsync();
+        customers = await Api.GetCustomersAsync();
         selectedDistributorId = distributors?.FirstOrDefault()?.Id ?? 0;
+        selectedCustomerId = customers?.FirstOrDefault()?.Id ?? 0;
         selectedProductId = products?.FirstOrDefault()?.Id ?? 0;
         await RefreshPrice();
     }
@@ -300,6 +330,7 @@ else
     {
         Channel = channel,
         DistributorId = channel == SalesChannel.Npp ? selectedDistributorId : null,
+        CustomerId = channel == SalesChannel.Retail ? selectedCustomerId : null,
         Lines = cart.Where(kv => kv.Value > 0).Select(kv => new OrderLineInput { ProductId = kv.Key, Qty = kv.Value }).ToList()
     };
 }

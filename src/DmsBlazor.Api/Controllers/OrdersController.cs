@@ -39,11 +39,25 @@ public class OrdersController(DmsDbContext db) : ControllerBase
                 .FirstOrDefaultAsync();
         }
 
+        string? customerName = null;
+        string? customerPhone = null;
+        if (request.Channel == SalesChannel.Retail && request.CustomerId.HasValue)
+        {
+            var customer = await db.Customers
+                .Where(c => c.Id == request.CustomerId.Value)
+                .Select(c => new { c.Name, c.Phone })
+                .FirstOrDefaultAsync();
+            customerName = customer?.Name;
+            customerPhone = customer?.Phone;
+        }
+
         var order = new Order
         {
             OrderCode = await OrderCodeGenerator.NextAsync(db),
             Channel = request.Channel,
             DistributorName = distributorName,
+            CustomerName = customerName,
+            CustomerPhone = customerPhone,
             TotalQty = priced.TotalQty,
             Subtotal = priced.Subtotal,
             DiscountPercent = priced.DiscountPercent,

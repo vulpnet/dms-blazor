@@ -1,0 +1,273 @@
+@page "/nha-phan-phoi"
+@using System.ComponentModel.DataAnnotations
+@using DmsBlazor.Shared.Models
+@using DmsBlazor.Client.Services
+@inject DmsApiClient Api
+
+<PageTitle>Quản lý nhà phân phối — DMS</PageTitle>
+
+<div class="page-header page-header-row">
+    <div>
+        <h1>Quản lý nhà phân phối</h1>
+        <p>Nhà phân phối (NPP) mua qua kênh sỉ — dùng để chọn khi đặt hàng.</p>
+    </div>
+    <button class="btn-primary" @onclick="OpenCreateForm">+ Thêm nhà phân phối</button>
+</div>
+
+@if (errorMessage is not null)
+{
+    <div class="alert-error">@errorMessage</div>
+}
+
+@if (distributors is null)
+{
+    <div class="skeleton-row"><div class="skeleton-card"></div></div>
+}
+else if (distributors.Count == 0)
+{
+    <p class="muted">Chưa có nhà phân phối nào. Bấm "Thêm nhà phân phối" để bắt đầu.</p>
+}
+else
+{
+    <div class="card">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Tên nhà phân phối</th>
+                    <th>Khu vực</th>
+                    <th>Đang hợp tác</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var d in distributors)
+                {
+                    <tr class="@(d.IsActive ? "" : "row-inactive")">
+                        <td>@d.Name</td>
+                        <td>@d.Region</td>
+                        <td>
+                            <label class="toggle">
+                                <input type="checkbox" checked="@d.IsActive" @onchange="e => ToggleActive(d, (bool)e.Value!)" />
+                                <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                            </label>
+                        </td>
+                        <td class="row-actions">
+                            <button class="btn-link" @onclick="() => OpenEditForm(d)">Sửa</button>
+                            <button class="btn-link danger" @onclick="() => ConfirmDelete(d)">Xoá</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@if (showForm)
+{
+    <div class="modal-backdrop" @onclick="CloseForm">
+        <div class="modal-panel" @onclick:stopPropagation="true">
+            <h3>@(editingId is null ? "Thêm nhà phân phối" : "Sửa nhà phân phối")</h3>
+
+            <EditForm Model="formModel" OnValidSubmit="SaveDistributor">
+                <DataAnnotationsValidator />
+
+                <div class="field">
+                    <label for="f-name">Tên nhà phân phối</label>
+                    <InputText id="f-name" @bind-Value="formModel.Name" placeholder="vd: NPP Hồng Phát" />
+                </div>
+                <div class="field">
+                    <label for="f-region">Khu vực</label>
+                    <InputText id="f-region" @bind-Value="formModel.Region" placeholder="vd: Miền Bắc" />
+                </div>
+
+                <div class="field field-checkbox">
+                    <label>
+                        <InputCheckbox @bind-Value="formModel.IsActive" />
+                        Đang hợp tác (hiện ở màn hình đặt hàng)
+                    </label>
+                </div>
+
+                @if (formError is not null)
+                {
+                    <div class="alert-error">@formError</div>
+                }
+
+                <div class="modal-actions">
+                    <button type="button" class="btn-outline" @onclick="CloseForm">Huỷ</button>
+                    <button type="submit" class="btn-primary" disabled="@saving">
+                        @(saving ? "Đang lưu..." : "Lưu")
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@if (confirmingDelete is not null)
+{
+    <div class="modal-backdrop" @onclick="() => confirmingDelete = null">
+        <div class="modal-panel modal-panel-sm" @onclick:stopPropagation="true">
+            <h3>Xoá nhà phân phối?</h3>
+            <p class="muted">Nhà phân phối <b>@confirmingDelete.Name</b> sẽ bị xoá vĩnh viễn. Đơn hàng cũ đã đặt vẫn giữ nguyên (lưu snapshot tên).</p>
+            <div class="modal-actions">
+                <button class="btn-outline" @onclick="() => confirmingDelete = null">Huỷ</button>
+                <button class="btn-danger" @onclick="DeleteDistributor">Xoá</button>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .page-header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
+    .row-actions { white-space: nowrap; text-align: right; }
+    .row-inactive { opacity: 0.55; }
+    .btn-link {
+        background: none; border: none; cursor: pointer;
+        color: var(--brand); font-weight: 600; font-size: 0.83rem;
+        padding: 0.2rem 0.4rem;
+    }
+    .btn-link.danger { color: var(--danger); }
+    .btn-link:hover { text-decoration: underline; }
+    .muted { color: var(--muted); font-size: 0.85rem; }
+
+    .modal-backdrop {
+        position: fixed; inset: 0;
+        background: rgba(15, 23, 42, 0.45);
+        display: flex; align-items: center; justify-content: center;
+        padding: 1rem;
+        z-index: 50;
+    }
+    .modal-panel {
+        background: var(--surface);
+        border-radius: var(--radius);
+        padding: 1.5rem;
+        width: 100%;
+        max-width: 420px;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: var(--shadow-md);
+    }
+    .modal-panel-sm { max-width: 380px; }
+    .modal-panel h3 { font-size: 1.05rem; margin-bottom: 1rem; }
+    .field { margin-bottom: 1rem; }
+    .field label { display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 0.35rem; }
+    .field input {
+        width: 100%;
+        padding: 0.55rem 0.7rem;
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        font-size: 0.88rem;
+    }
+    .field-checkbox label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.88rem; font-weight: 500; color: var(--ink); cursor: pointer; }
+    .field-checkbox input { width: auto !important; accent-color: var(--brand); }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 1.25rem; }
+    .btn-danger {
+        background: var(--danger); color: #fff; border: none;
+        border-radius: 8px; padding: 0.6rem 1.2rem; font-weight: 600; cursor: pointer; font-size: 0.88rem;
+    }
+</style>
+
+@code {
+    private List<Distributor>? distributors;
+    private string? errorMessage;
+
+    private bool showForm;
+    private int? editingId;
+    private DistributorFormModel formModel = new();
+    private string? formError;
+    private bool saving;
+
+    private Distributor? confirmingDelete;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDistributors();
+    }
+
+    private async Task LoadDistributors()
+    {
+        try
+        {
+            distributors = await Api.GetManagedDistributorsAsync();
+        }
+        catch
+        {
+            errorMessage = "Không tải được danh sách nhà phân phối. Kiểm tra kết nối tới máy chủ.";
+        }
+    }
+
+    private void OpenCreateForm()
+    {
+        editingId = null;
+        formModel = new DistributorFormModel();
+        formError = null;
+        showForm = true;
+    }
+
+    private void OpenEditForm(Distributor d)
+    {
+        editingId = d.Id;
+        formModel = new DistributorFormModel { Name = d.Name, Region = d.Region, IsActive = d.IsActive };
+        formError = null;
+        showForm = true;
+    }
+
+    private void CloseForm() => showForm = false;
+
+    private async Task SaveDistributor()
+    {
+        saving = true;
+        formError = null;
+
+        var distributor = new Distributor
+        {
+            Name = formModel.Name.Trim(),
+            Region = formModel.Region.Trim(),
+            IsActive = formModel.IsActive
+        };
+
+        var (success, error) = editingId is null
+            ? await Api.CreateDistributorAsync(distributor)
+            : await Api.UpdateDistributorAsync(editingId.Value, distributor);
+
+        saving = false;
+
+        if (!success)
+        {
+            formError = error ?? "Lưu không thành công.";
+            return;
+        }
+
+        showForm = false;
+        await LoadDistributors();
+    }
+
+    private async Task ToggleActive(Distributor d, bool isActive)
+    {
+        d.IsActive = isActive;
+        var updated = new Distributor { Name = d.Name, Region = d.Region, IsActive = isActive };
+        var (success, _) = await Api.UpdateDistributorAsync(d.Id, updated);
+        if (!success) await LoadDistributors();
+    }
+
+    private void ConfirmDelete(Distributor d) => confirmingDelete = d;
+
+    private async Task DeleteDistributor()
+    {
+        if (confirmingDelete is null) return;
+        await Api.DeleteDistributorAsync(confirmingDelete.Id);
+        confirmingDelete = null;
+        await LoadDistributors();
+    }
+
+    public class DistributorFormModel
+    {
+        [Required(ErrorMessage = "Bắt buộc nhập tên nhà phân phối")]
+        public string Name { get; set; } = "";
+
+        [Required(ErrorMessage = "Bắt buộc nhập khu vực")]
+        public string Region { get; set; } = "";
+
+        public bool IsActive { get; set; } = true;
+    }
+}

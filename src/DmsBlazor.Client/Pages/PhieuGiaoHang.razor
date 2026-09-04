@@ -16,6 +16,10 @@
             {
                 <div><b>Nhà phân phối:</b> @Order.DistributorName</div>
             }
+            @if (!string.IsNullOrEmpty(Order.CustomerName))
+            {
+                <div><b>Khách hàng:</b> @Order.CustomerName @(!string.IsNullOrEmpty(Order.CustomerPhone) ? $"— {Order.CustomerPhone}" : "")</div>
+            }
             @if (!string.IsNullOrEmpty(Order.DeliveryTripCode))
             {
                 <div><b>Chuyến giao:</b> @Order.DeliveryTripCode</div>

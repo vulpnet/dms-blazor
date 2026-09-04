@@ -16,6 +16,7 @@ public class CreateOrderRequest
 {
     public SalesChannel Channel { get; set; }
     public int? DistributorId { get; set; } // chỉ áp dụng kênh NPP
+    public int? CustomerId { get; set; }     // chỉ áp dụng kênh Retail
     public List<OrderLineInput> Lines { get; set; } = [];
 }
 
@@ -63,7 +64,9 @@ public class Order
     public int Id { get; set; }
     public string OrderCode { get; set; } = "";      // vd DH-2026-0001, tăng dần theo năm
     public SalesChannel Channel { get; set; }
-    public string? DistributorName { get; set; }      // snapshot tên NPP, null nếu kênh bán lẻ
+    public string? DistributorName { get; set; }      // snapshot tên NPP, chỉ có ở kênh Npp
+    public string? CustomerName { get; set; }          // snapshot tên khách lẻ, chỉ có ở kênh Retail
+    public string? CustomerPhone { get; set; }
     public OrderStatus Status { get; set; } = OrderStatus.Confirmed;
     public int TotalQty { get; set; }
     public decimal Subtotal { get; set; }

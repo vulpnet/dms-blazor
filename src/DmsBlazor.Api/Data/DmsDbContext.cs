@@ -6,6 +6,7 @@ namespace DmsBlazor.Api.Data;
 public class DmsDbContext(DbContextOptions<DmsDbContext> options) : DbContext(options)
 {
     public DbSet<Distributor> Distributors => Set<Distributor>();
+    public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<Product> Products => Set<Product>();
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderLine> OrderLines => Set<OrderLine>();
@@ -20,6 +21,16 @@ public class DmsDbContext(DbContextOptions<DmsDbContext> options) : DbContext(op
             e.ToTable("distributors");
             e.Property(x => x.Name).HasMaxLength(200).IsRequired();
             e.Property(x => x.Region).HasMaxLength(100).IsRequired();
+            e.Property(x => x.IsActive).HasDefaultValue(true);
+        });
+
+        modelBuilder.Entity<Customer>(e =>
+        {
+            e.ToTable("customers");
+            e.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            e.Property(x => x.Phone).HasMaxLength(30);
+            e.Property(x => x.Address).HasMaxLength(300);
+            e.Property(x => x.IsActive).HasDefaultValue(true);
         });
 
         modelBuilder.Entity<Product>(e =>
@@ -65,6 +76,8 @@ public class DmsDbContext(DbContextOptions<DmsDbContext> options) : DbContext(op
             e.Property(x => x.OrderCode).HasMaxLength(30).IsRequired();
             e.HasIndex(x => x.OrderCode).IsUnique();
             e.Property(x => x.DistributorName).HasMaxLength(200);
+            e.Property(x => x.CustomerName).HasMaxLength(200);
+            e.Property(x => x.CustomerPhone).HasMaxLength(30);
             e.Property(x => x.Subtotal).HasPrecision(14, 2);
             e.Property(x => x.DiscountAmount).HasPrecision(14, 2);
             e.Property(x => x.Total).HasPrecision(14, 2);
