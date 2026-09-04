@@ -44,7 +44,7 @@ else
         <div class="route-summary">
             @foreach (var summary in RouteSummaries)
             {
-                <button class="summary-card" @onclick="() => OpenRouteDetail(summary.RouteCode)">
+                <button class="summary-card @(detailRouteCode == summary.RouteCode ? "active" : "")" @onclick="() => ToggleRouteDetail(summary.RouteCode)">
                     <div class="summary-route"><code>@summary.RouteCode</code> · @summary.RouteName</div>
                     <div class="summary-counts">
                         <span class="count-ordered">@summary.OrderedCount đã đặt đơn</span>
@@ -53,6 +53,47 @@ else
                 </button>
             }
         </div>
+
+        @if (detailRouteCode is not null)
+        {
+            <div class="route-detail">
+                <h4>✅ Đã đặt đơn (@DetailOrderedStops.Count())</h4>
+                @if (!DetailOrderedStops.Any())
+                {
+                    <p class="muted">Chưa có điểm nào đặt đơn hôm nay.</p>
+                }
+                else
+                {
+                    <ul class="detail-list">
+                        @foreach (var stop in DetailOrderedStops)
+                        {
+                            <li>
+                                <span>@stop.StopName</span>
+                                <span class="detail-type">@(stop.StopType == StopType.Customer ? "Khách hàng" : "Nhà phân phối")</span>
+                            </li>
+                        }
+                    </ul>
+                }
+
+                <h4>⏳ Chưa đặt đơn (@DetailPendingStops.Count())</h4>
+                @if (!DetailPendingStops.Any())
+                {
+                    <p class="muted">Tất cả điểm trong tuyến đã đặt đơn hôm nay.</p>
+                }
+                else
+                {
+                    <ul class="detail-list">
+                        @foreach (var stop in DetailPendingStops)
+                        {
+                            <li>
+                                <span>@stop.StopName</span>
+                                <span class="detail-type">@(stop.StopType == StopType.Customer ? "Khách hàng" : "Nhà phân phối") · @StatusLabel(stop.Status)</span>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        }
 
         <div class="card">
             <table class="data-table">
@@ -87,55 +128,6 @@ else
             </table>
         </div>
     }
-}
-
-@if (detailRouteCode is not null)
-{
-    <div class="modal-backdrop" @onclick="() => detailRouteCode = null">
-        <div class="modal-panel modal-panel-lg" @onclick:stopPropagation="true">
-            <h3>Chi tiết tuyến <code>@detailRouteCode</code></h3>
-
-            <h4>✅ Đã đặt đơn (@DetailOrderedStops.Count())</h4>
-            @if (!DetailOrderedStops.Any())
-            {
-                <p class="muted">Chưa có điểm nào đặt đơn hôm nay.</p>
-            }
-            else
-            {
-                <ul class="detail-list">
-                    @foreach (var stop in DetailOrderedStops)
-                    {
-                        <li>
-                            <span>@stop.StopName</span>
-                            <span class="detail-type">@(stop.StopType == StopType.Customer ? "Khách hàng" : "Nhà phân phối")</span>
-                        </li>
-                    }
-                </ul>
-            }
-
-            <h4>⏳ Chưa đặt đơn (@DetailPendingStops.Count())</h4>
-            @if (!DetailPendingStops.Any())
-            {
-                <p class="muted">Tất cả điểm trong tuyến đã đặt đơn hôm nay.</p>
-            }
-            else
-            {
-                <ul class="detail-list">
-                    @foreach (var stop in DetailPendingStops)
-                    {
-                        <li>
-                            <span>@stop.StopName</span>
-                            <span class="detail-type">@(stop.StopType == StopType.Customer ? "Khách hàng" : "Nhà phân phối") · @StatusLabel(stop.Status)</span>
-                        </li>
-                    }
-                </ul>
-            }
-
-            <div class="modal-actions">
-                <button class="btn-outline" @onclick="() => detailRouteCode = null">Đóng</button>
-            </div>
-        </div>
-    </div>
 }
 
 @if (markingStop is not null)
@@ -190,10 +182,18 @@ else
         cursor: pointer; text-align: left; font: inherit; color: inherit;
     }
     .summary-card:hover { border-color: var(--brand); }
+    .summary-card.active { border-color: var(--brand); background: var(--brand-soft); }
     .summary-route { font-size: 0.83rem; font-weight: 600; margin-bottom: 0.4rem; }
     .summary-counts { display: flex; gap: 0.75rem; font-size: 0.8rem; font-weight: 600; }
     .count-ordered { color: var(--success); }
     .count-pending { color: var(--muted); }
+
+    .route-detail {
+        border: 1px solid var(--line); border-radius: var(--radius); padding: 1rem 1.25rem;
+        background: var(--surface); box-shadow: var(--shadow-sm); margin-bottom: 1.25rem;
+    }
+    .route-detail h4 { font-size: 0.85rem; font-weight: 650; margin: 0 0 0.5rem; }
+    .route-detail h4:not(:first-child) { margin-top: 1.1rem; }
 
     .modal-backdrop {
         position: fixed; inset: 0; background: rgba(15,23,42,0.45);
@@ -203,9 +203,7 @@ else
         background: var(--surface); border-radius: var(--radius); padding: 1.5rem;
         width: 100%; max-width: 420px; box-shadow: var(--shadow-md);
     }
-    .modal-panel-lg { max-width: 480px; max-height: 85vh; overflow-y: auto; }
     .modal-panel h3 { font-size: 1.05rem; margin-bottom: 0.5rem; }
-    .modal-panel h4 { font-size: 0.85rem; font-weight: 650; margin: 1.1rem 0 0.5rem; }
     .modal-actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 1.25rem; }
     .detail-list { list-style: none; margin: 0; padding: 0; }
     .detail-list li {
@@ -262,7 +260,8 @@ else
         stops = await Api.GetTodayStopsAsync(selectedRepId);
     }
 
-    private void OpenRouteDetail(string routeCode) => detailRouteCode = routeCode;
+    private void ToggleRouteDetail(string routeCode) =>
+        detailRouteCode = detailRouteCode == routeCode ? null : routeCode;
 
     private void OpenMarkForm(TodayStop stop)
     {
