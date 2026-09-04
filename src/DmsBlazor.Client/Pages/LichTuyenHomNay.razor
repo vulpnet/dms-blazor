@@ -41,6 +41,19 @@ else
     }
     else
     {
+        <div class="route-summary">
+            @foreach (var summary in RouteSummaries)
+            {
+                <div class="summary-card">
+                    <div class="summary-route"><code>@summary.RouteCode</code> · @summary.RouteName</div>
+                    <div class="summary-counts">
+                        <span class="count-ordered">@summary.OrderedCount đã đặt đơn</span>
+                        <span class="count-pending">@summary.PendingCount chưa đặt đơn</span>
+                    </div>
+                </div>
+            }
+        </div>
+
         <div class="card">
             <table class="data-table">
                 <thead>
@@ -121,6 +134,16 @@ else
     .channel-badge.visited-no-order { background: var(--warning-soft); color: var(--warning); }
     .channel-badge.ordered { background: var(--success-soft); color: var(--success); }
 
+    .route-summary { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1.25rem; }
+    .summary-card {
+        border: 1px solid var(--line); border-radius: var(--radius); padding: 0.75rem 1rem;
+        background: var(--surface); box-shadow: var(--shadow-sm); min-width: 220px;
+    }
+    .summary-route { font-size: 0.83rem; font-weight: 600; margin-bottom: 0.4rem; }
+    .summary-counts { display: flex; gap: 0.75rem; font-size: 0.8rem; font-weight: 600; }
+    .count-ordered { color: var(--success); }
+    .count-pending { color: var(--muted); }
+
     .modal-backdrop {
         position: fixed; inset: 0; background: rgba(15,23,42,0.45);
         display: flex; align-items: center; justify-content: center; padding: 1rem; z-index: 50;
@@ -141,6 +164,19 @@ else
     private TodayStop? markingStop;
     private string visitNote = "";
     private bool marking;
+
+    private record RouteSummary(string RouteCode, string RouteName, int OrderedCount, int PendingCount);
+
+    // Gộp "Chưa ghé" + "Đã ghé, không đặt" thành 1 số "chưa đặt đơn" — người dùng chỉ
+    // cần biết còn bao nhiêu điểm chưa ra đơn hôm nay, không cần tách theo lý do.
+    private IEnumerable<RouteSummary> RouteSummaries => (stops ?? [])
+        .GroupBy(s => (s.RouteCode, s.RouteName))
+        .Select(g => new RouteSummary(
+            g.Key.RouteCode,
+            g.Key.RouteName,
+            g.Count(s => s.Status == VisitStatus.Ordered),
+            g.Count(s => s.Status != VisitStatus.Ordered)))
+        .OrderBy(s => s.RouteCode);
 
     protected override async Task OnInitializedAsync()
     {
