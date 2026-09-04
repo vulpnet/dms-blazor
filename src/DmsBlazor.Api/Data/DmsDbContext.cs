@@ -13,6 +13,9 @@ public class DmsDbContext(DbContextOptions<DmsDbContext> options) : DbContext(op
     public DbSet<OrderEditLog> OrderEditLogs => Set<OrderEditLog>();
     public DbSet<Driver> Drivers => Set<Driver>();
     public DbSet<DeliveryTrip> DeliveryTrips => Set<DeliveryTrip>();
+    public DbSet<SalesRep> SalesReps => Set<SalesRep>();
+    public DbSet<SalesRoute> SalesRoutes => Set<SalesRoute>();
+    public DbSet<RouteStop> RouteStops => Set<RouteStop>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -51,6 +54,7 @@ public class DmsDbContext(DbContextOptions<DmsDbContext> options) : DbContext(op
         // lock/đếm bằng tay ở code C#).
         modelBuilder.HasSequence<int>("order_number_seq").StartsAt(1).IncrementsBy(1);
         modelBuilder.HasSequence<int>("trip_number_seq").StartsAt(1).IncrementsBy(1);
+        modelBuilder.HasSequence<int>("route_number_seq").StartsAt(1).IncrementsBy(1);
 
         modelBuilder.Entity<Driver>(e =>
         {
@@ -104,6 +108,31 @@ public class DmsDbContext(DbContextOptions<DmsDbContext> options) : DbContext(op
         {
             e.ToTable("order_edit_logs");
             e.Property(x => x.Description).HasMaxLength(500).IsRequired();
+        });
+
+        modelBuilder.Entity<SalesRep>(e =>
+        {
+            e.ToTable("sales_reps");
+            e.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            e.Property(x => x.Phone).HasMaxLength(30);
+            e.Property(x => x.IsActive).HasDefaultValue(true);
+        });
+
+        modelBuilder.Entity<SalesRoute>(e =>
+        {
+            e.ToTable("sales_routes");
+            e.Property(x => x.RouteCode).HasMaxLength(30).IsRequired();
+            e.HasIndex(x => x.RouteCode).IsUnique();
+            e.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            e.Property(x => x.SalesRepName).HasMaxLength(200).IsRequired();
+            e.Property(x => x.IsActive).HasDefaultValue(true);
+            e.HasMany(x => x.Stops).WithOne().HasForeignKey(s => s.RouteId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<RouteStop>(e =>
+        {
+            e.ToTable("route_stops");
+            e.Property(x => x.StopName).HasMaxLength(200).IsRequired();
         });
     }
 }

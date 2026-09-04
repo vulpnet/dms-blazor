@@ -1,0 +1,117 @@
+@page "/lich-tuyen-hom-nay"
+@using DmsBlazor.Shared.Models
+@using DmsBlazor.Client.Services
+@inject DmsApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>Lịch tuyến hôm nay — DMS</PageTitle>
+
+<div class="page-header">
+    <h1>Lịch tuyến hôm nay</h1>
+    <p>Danh sách điểm bán cần ghé thăm hôm nay theo tuyến đã gán — bấm vào 1 điểm để đặt hàng ngay.</p>
+</div>
+
+@if (reps is null)
+{
+    <div class="skeleton-row"><div class="skeleton-card"></div></div>
+}
+else if (reps.Count == 0)
+{
+    <p class="muted">Chưa có nhân viên bán hàng nào — <a href="/nhan-vien-ban-hang">thêm nhân viên</a> trước.</p>
+}
+else
+{
+    <div class="field">
+        <label for="rep-select">Bạn là</label>
+        <select id="rep-select" @bind="selectedRepId" @bind:after="LoadToday">
+            @foreach (var r in reps)
+            {
+                <option value="@r.Id">@r.Name</option>
+            }
+        </select>
+    </div>
+
+    @if (stops is null)
+    {
+        <div class="skeleton-row"><div class="skeleton-card"></div></div>
+    }
+    else if (stops.Count == 0)
+    {
+        <p class="muted">Hôm nay không có điểm dừng nào trong lịch tuyến của bạn.</p>
+    }
+    else
+    {
+        <div class="card">
+            <table class="data-table">
+                <thead>
+                    <tr><th></th><th>Điểm bán</th><th>Tuyến</th><th>Loại</th><th>Trạng thái</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var (stop, index) in stops.Select((s, i) => (s, i)))
+                    {
+                        <tr class="@(stop.HasOrderToday ? "row-done" : "")">
+                            <td>@(index + 1)</td>
+                            <td>@stop.StopName</td>
+                            <td><code>@stop.RouteCode</code></td>
+                            <td>@(stop.StopType == StopType.Customer ? "Khách hàng" : "Nhà phân phối")</td>
+                            <td>
+                                @if (stop.HasOrderToday)
+                                {
+                                    <span class="channel-badge done">Đã có đơn hôm nay</span>
+                                }
+                                else
+                                {
+                                    <span class="channel-badge pending">Chưa ghé</span>
+                                }
+                            </td>
+                            <td class="row-actions">
+                                <a href="@BuildOrderLink(stop)" class="btn-link">Đặt hàng →</a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+}
+
+<style>
+    .field { max-width: 320px; margin-bottom: 1.5rem; }
+    .field label { display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 0.4rem; }
+    .field select { width: 100%; padding: 0.55rem 0.7rem; border: 1px solid var(--line-strong); border-radius: 8px; font-size: 0.88rem; }
+    .muted { color: var(--muted); font-size: 0.85rem; }
+    .row-actions { text-align: right; white-space: nowrap; }
+    .btn-link { color: var(--brand); font-weight: 600; font-size: 0.83rem; text-decoration: none; }
+    .btn-link:hover { text-decoration: underline; }
+    .row-done { opacity: 0.6; }
+    .channel-badge { font-size: 0.75rem; font-weight: 650; padding: 0.2rem 0.55rem; border-radius: 999px; }
+    .channel-badge.pending { background: #eef1f5; color: #475569; }
+    .channel-badge.done { background: var(--success-soft); color: var(--success); }
+</style>
+
+@code {
+    private List<SalesRep>? reps;
+    private List<TodayStop>? stops;
+    private int selectedRepId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        reps = await Api.GetSalesRepsAsync();
+        selectedRepId = reps?.FirstOrDefault()?.Id ?? 0;
+        if (selectedRepId != 0) await LoadToday();
+    }
+
+    private async Task LoadToday()
+    {
+        stops = null;
+        if (selectedRepId == 0) return;
+        stops = await Api.GetTodayStopsAsync(selectedRepId);
+    }
+
+    private static string BuildOrderLink(TodayStop stop)
+    {
+        var channel = stop.StopType == StopType.Customer ? "Retail" : "Npp";
+        var idParam = stop.StopType == StopType.Customer ? "customerId" : "distributorId";
+        return $"/dat-hang?channel={channel}&{idParam}={stop.TargetId}";
+    }
+}

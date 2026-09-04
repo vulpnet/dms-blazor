@@ -1,0 +1,157 @@
+@page "/nhan-vien-ban-hang"
+@using DmsBlazor.Shared.Models
+@using DmsBlazor.Client.Services
+@inject DmsApiClient Api
+
+<PageTitle>Nhân viên bán hàng — DMS</PageTitle>
+
+<div class="page-header page-header-row">
+    <div>
+        <h1>Nhân viên bán hàng</h1>
+        <p>Danh sách nhân viên dùng để gán vào tuyến bán hàng.</p>
+    </div>
+    <button class="btn-primary" @onclick="OpenCreateForm">+ Thêm nhân viên</button>
+</div>
+
+@if (editing is not null)
+{
+    <div class="card form-card">
+        <h3>@(editing.Id == 0 ? "Thêm nhân viên mới" : "Sửa thông tin nhân viên")</h3>
+        <div class="form-grid">
+            <div class="field">
+                <label for="r-name">Họ tên</label>
+                <input id="r-name" @bind="editing.Name" />
+            </div>
+            <div class="field">
+                <label for="r-phone">Điện thoại</label>
+                <input id="r-phone" @bind="editing.Phone" />
+            </div>
+        </div>
+
+        @if (formError is not null)
+        {
+            <div class="alert-error">@formError</div>
+        }
+
+        <div class="modal-actions">
+            <button class="btn-outline" @onclick="() => editing = null">Huỷ bỏ</button>
+            <button class="btn-primary" disabled="@saving" @onclick="Save">@(saving ? "Đang lưu..." : "Lưu")</button>
+        </div>
+    </div>
+}
+
+@if (reps is null)
+{
+    <div class="skeleton-row"><div class="skeleton-card"></div></div>
+}
+else if (reps.Count == 0)
+{
+    <p class="muted">Chưa có nhân viên bán hàng nào.</p>
+}
+else
+{
+    <div class="card">
+        <table class="data-table">
+            <thead>
+                <tr><th>Họ tên</th><th>Điện thoại</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var r in reps)
+                {
+                    <tr>
+                        <td>@r.Name</td>
+                        <td>@r.Phone</td>
+                        <td class="row-actions">
+                            <button class="btn-link" @onclick="() => OpenEditForm(r)">Sửa</button>
+                            <button class="btn-link danger" @onclick="() => Deactivate(r.Id)">Ngừng hoạt động</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+<style>
+    .page-header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
+    .btn-primary {
+        background: var(--brand); color: #fff; border: none; border-radius: 8px;
+        padding: 0.6rem 1.2rem; font-weight: 600; cursor: pointer; font-size: 0.85rem;
+    }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-outline {
+        border: 1px solid var(--line-strong); color: var(--ink); background: var(--surface);
+        padding: 0.55rem 1rem; border-radius: 8px; font-weight: 600; font-size: 0.85rem; cursor: pointer;
+    }
+    .btn-link { border: none; background: transparent; color: var(--brand); font-weight: 600; font-size: 0.83rem; cursor: pointer; }
+    .btn-link.danger { color: var(--danger); }
+    .row-actions { text-align: right; white-space: nowrap; display: flex; gap: 0.6rem; justify-content: flex-end; }
+    .muted { color: var(--muted); font-size: 0.85rem; }
+
+    .form-card { margin-bottom: 1.5rem; }
+    .form-card h3 { margin-bottom: 1rem; }
+    .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+    @@media (max-width: 700px) {
+        .form-grid { grid-template-columns: 1fr; }
+    }
+    .field label { display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 0.4rem; }
+    .field input { width: 100%; padding: 0.55rem 0.7rem; border: 1px solid var(--line-strong); border-radius: 8px; font-size: 0.88rem; box-sizing: border-box; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 1.25rem; }
+</style>
+
+@code {
+    private List<SalesRep>? reps;
+    private SalesRep? editing;
+    private bool saving;
+    private string? formError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Reload();
+    }
+
+    private async Task Reload() => reps = await Api.GetSalesRepsAsync();
+
+    private void OpenCreateForm()
+    {
+        formError = null;
+        editing = new SalesRep();
+    }
+
+    private void OpenEditForm(SalesRep r)
+    {
+        formError = null;
+        editing = new SalesRep { Id = r.Id, Name = r.Name, Phone = r.Phone, IsActive = r.IsActive };
+    }
+
+    private async Task Save()
+    {
+        if (editing is null) return;
+        if (string.IsNullOrWhiteSpace(editing.Name))
+        {
+            formError = "Vui lòng nhập họ tên.";
+            return;
+        }
+
+        saving = true;
+        var (success, error) = editing.Id == 0
+            ? await Api.CreateSalesRepAsync(editing)
+            : await Api.UpdateSalesRepAsync(editing.Id, editing);
+        saving = false;
+
+        if (!success)
+        {
+            formError = error ?? "Không thể lưu nhân viên.";
+            return;
+        }
+
+        editing = null;
+        await Reload();
+    }
+
+    private async Task Deactivate(int id)
+    {
+        await Api.DeactivateSalesRepAsync(id);
+        await Reload();
+    }
+}

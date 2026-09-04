@@ -185,4 +185,58 @@ public class DmsApiClient(HttpClient http)
         var res = await http.DeleteAsync($"api/distributors/{id}");
         return res.IsSuccessStatusCode;
     }
+
+    // ===== Tuyến bán hàng: nhân viên bán hàng + tuyến =====
+
+    public Task<List<SalesRep>?> GetSalesRepsAsync(bool includeInactive = false) =>
+        http.GetFromJsonAsync<List<SalesRep>>($"api/salesreps?includeInactive={includeInactive}");
+
+    public async Task<(bool Success, string? Error)> CreateSalesRepAsync(SalesRep rep)
+    {
+        var res = await http.PostAsJsonAsync("api/salesreps", rep);
+        if (res.IsSuccessStatusCode) return (true, null);
+        return (false, await res.Content.ReadAsStringAsync());
+    }
+
+    public async Task<(bool Success, string? Error)> UpdateSalesRepAsync(int id, SalesRep rep)
+    {
+        var res = await http.PutAsJsonAsync($"api/salesreps/{id}", rep);
+        if (res.IsSuccessStatusCode) return (true, null);
+        return (false, await res.Content.ReadAsStringAsync());
+    }
+
+    public async Task<bool> DeactivateSalesRepAsync(int id)
+    {
+        var res = await http.PostAsync($"api/salesreps/{id}/deactivate", null);
+        return res.IsSuccessStatusCode;
+    }
+
+    public Task<List<SalesRoute>?> GetRoutesAsync() =>
+        http.GetFromJsonAsync<List<SalesRoute>>("api/salesroutes");
+
+    public Task<SalesRoute?> GetRouteByCodeAsync(string code) =>
+        http.GetFromJsonAsync<SalesRoute?>($"api/salesroutes/{code}");
+
+    public async Task<(bool Success, string? Error)> CreateRouteAsync(SaveRouteRequest request)
+    {
+        var res = await http.PostAsJsonAsync("api/salesroutes", request);
+        if (res.IsSuccessStatusCode) return (true, null);
+        return (false, await res.Content.ReadAsStringAsync());
+    }
+
+    public async Task<(bool Success, string? Error)> UpdateRouteAsync(string code, SaveRouteRequest request)
+    {
+        var res = await http.PutAsJsonAsync($"api/salesroutes/{code}", request);
+        if (res.IsSuccessStatusCode) return (true, null);
+        return (false, await res.Content.ReadAsStringAsync());
+    }
+
+    public async Task<bool> DeactivateRouteAsync(string code)
+    {
+        var res = await http.PostAsync($"api/salesroutes/{code}/deactivate", null);
+        return res.IsSuccessStatusCode;
+    }
+
+    public Task<List<TodayStop>?> GetTodayStopsAsync(int salesRepId) =>
+        http.GetFromJsonAsync<List<TodayStop>>($"api/salesroutes/today/{salesRepId}");
 }

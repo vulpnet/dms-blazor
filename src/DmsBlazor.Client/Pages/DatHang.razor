@@ -1,4 +1,5 @@
 @page "/dat-hang"
+@using System.Web
 @using DmsBlazor.Shared.Models
 @using DmsBlazor.Client.Services
 @inject DmsApiClient Api
@@ -274,9 +275,22 @@ else
         products = await Api.GetProductsAsync();
         distributors = await Api.GetDistributorsAsync();
         customers = await Api.GetCustomersAsync();
-        selectedDistributorId = distributors?.FirstOrDefault()?.Id ?? 0;
-        selectedCustomerId = customers?.FirstOrDefault()?.Id ?? 0;
         selectedProductId = products?.FirstOrDefault()?.Id ?? 0;
+
+        // Hỗ trợ điều hướng sẵn kênh + khách/NPP từ trang Lịch tuyến hôm nay
+        // (?channel=Retail&customerId=5) — bấm 1 điểm dừng là vào thẳng đơn đúng khách.
+        var uri = new Uri(Nav.Uri);
+        var query = HttpUtility.ParseQueryString(uri.Query);
+        if (Enum.TryParse<SalesChannel>(query["channel"], out var preselectedChannel))
+            channel = preselectedChannel;
+
+        selectedDistributorId = int.TryParse(query["distributorId"], out var distId) && distributors?.Any(d => d.Id == distId) == true
+            ? distId
+            : distributors?.FirstOrDefault()?.Id ?? 0;
+        selectedCustomerId = int.TryParse(query["customerId"], out var custId) && customers?.Any(c => c.Id == custId) == true
+            ? custId
+            : customers?.FirstOrDefault()?.Id ?? 0;
+
         await RefreshPrice();
     }
 

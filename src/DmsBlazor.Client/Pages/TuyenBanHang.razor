@@ -1,0 +1,369 @@
+@page "/tuyen-ban-hang"
+@using System.ComponentModel.DataAnnotations
+@using DmsBlazor.Shared.Models
+@using DmsBlazor.Client.Services
+@inject DmsApiClient Api
+
+<PageTitle>Tuyến bán hàng — DMS</PageTitle>
+
+<div class="page-header page-header-row">
+    <div>
+        <h1>Tuyến bán hàng</h1>
+        <p>Lịch trình cố định các điểm bán mà nhân viên bán hàng ghé thăm theo tuần.</p>
+    </div>
+    <button class="btn-primary" @onclick="OpenCreateForm">+ Tạo tuyến mới</button>
+</div>
+
+@if (errorMessage is not null)
+{
+    <div class="alert-error">@errorMessage</div>
+}
+
+@if (showForm)
+{
+    <div class="card form-card">
+        <h3>@(editingCode is null ? "Tạo tuyến mới" : $"Sửa tuyến {editingCode}")</h3>
+
+        @if (reps is null || customers is null || distributors is null)
+        {
+            <p class="muted">Đang tải dữ liệu...</p>
+        }
+        else if (reps.Count == 0)
+        {
+            <p class="muted">Chưa có nhân viên bán hàng nào — <a href="/nhan-vien-ban-hang">thêm nhân viên</a> trước khi tạo tuyến.</p>
+        }
+        else
+        {
+            <div class="field-row">
+                <div class="field">
+                    <label for="route-name">Tên tuyến</label>
+                    <input id="route-name" @bind="routeName" placeholder="vd: Tuyến Quận 1 - Thứ 2/4/6" />
+                </div>
+                <div class="field">
+                    <label for="rep-select">Nhân viên phụ trách</label>
+                    <select id="rep-select" @bind="selectedRepId">
+                        @foreach (var r in reps)
+                        {
+                            <option value="@r.Id">@r.Name</option>
+                        }
+                    </select>
+                </div>
+            </div>
+
+            <h4>Thêm điểm dừng</h4>
+            <div class="picker-row">
+                <div class="field">
+                    <label for="stop-type-select">Loại điểm</label>
+                    <select id="stop-type-select" @bind="pickerStopType">
+                        <option value="@StopType.Customer">Khách hàng</option>
+                        <option value="@StopType.Distributor">Nhà phân phối</option>
+                    </select>
+                </div>
+                <div class="field field-grow">
+                    <label for="target-select">Điểm bán</label>
+                    <select id="target-select" @bind="pickerTargetId">
+                        @if (pickerStopType == StopType.Customer)
+                        {
+                            @foreach (var c in customers)
+                            {
+                                <option value="@c.Id">@c.Name</option>
+                            }
+                        }
+                        else
+                        {
+                            @foreach (var d in distributors)
+                            {
+                                <option value="@d.Id">@d.Name</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <button class="btn-outline" @onclick="AddStop">+ Thêm vào tuyến</button>
+            </div>
+
+            @if (stops.Count > 0)
+            {
+                <table class="data-table stop-table">
+                    <thead>
+                        <tr><th></th><th>Điểm bán</th><th>Loại</th><th>Ngày ghé</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var (stop, index) in stops.Select((s, i) => (s, i)))
+                        {
+                            <tr>
+                                <td>@(index + 1)</td>
+                                <td>@StopName(stop)</td>
+                                <td>@(stop.StopType == StopType.Customer ? "Khách hàng" : "Nhà phân phối")</td>
+                                <td>
+                                    <div class="day-toggles">
+                                        @foreach (var day in AllDays)
+                                        {
+                                            <label class="day-chip @(stop.VisitDays.HasFlag(day.Value) ? "active" : "")">
+                                                <input type="checkbox" checked="@stop.VisitDays.HasFlag(day.Value)" @onchange="e => ToggleDay(stop, day.Value, (bool)e.Value!)" />
+                                                @day.Label
+                                            </label>
+                                        }
+                                    </div>
+                                </td>
+                                <td><button class="btn-remove" @onclick="() => stops.RemoveAt(index)">✕</button></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <p class="muted">Chưa có điểm dừng nào — thêm ít nhất 1 điểm trước khi lưu.</p>
+            }
+
+            @if (formError is not null)
+            {
+                <div class="alert-error">@formError</div>
+            }
+
+            <div class="modal-actions">
+                <button class="btn-outline" @onclick="() => showForm = false">Huỷ bỏ</button>
+                <button class="btn-primary" disabled="@(stops.Count == 0 || saving)" @onclick="SaveRoute">
+                    @(saving ? "Đang lưu..." : "Lưu tuyến")
+                </button>
+            </div>
+        }
+    </div>
+}
+
+@if (routes is null)
+{
+    <div class="skeleton-row"><div class="skeleton-card"></div></div>
+}
+else if (routes.Count == 0)
+{
+    <p class="muted">Chưa có tuyến bán hàng nào.</p>
+}
+else
+{
+    <div class="card">
+        <table class="data-table">
+            <thead>
+                <tr><th>Mã tuyến</th><th>Tên tuyến</th><th>Nhân viên</th><th class="text-right">Số điểm dừng</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var r in routes)
+                {
+                    <tr class="@(r.IsActive ? "" : "row-inactive")">
+                        <td><code>@r.RouteCode</code></td>
+                        <td>@r.Name</td>
+                        <td>@r.SalesRepName</td>
+                        <td class="text-right">@r.Stops.Count</td>
+                        <td class="row-actions">
+                            <button class="btn-link" @onclick="() => OpenEditForm(r)">Sửa</button>
+                            @if (r.IsActive)
+                            {
+                                <button class="btn-link danger" @onclick="() => Deactivate(r.RouteCode)">Ngừng dùng</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+<style>
+    .page-header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
+    .btn-primary {
+        background: var(--brand); color: #fff; border: none; border-radius: 8px;
+        padding: 0.6rem 1.2rem; font-weight: 600; cursor: pointer; font-size: 0.85rem;
+    }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-outline {
+        border: 1px solid var(--line-strong); color: var(--ink); background: var(--surface);
+        padding: 0.55rem 1rem; border-radius: 8px; font-weight: 600; font-size: 0.85rem; cursor: pointer;
+    }
+    .btn-link { background: none; border: none; cursor: pointer; color: var(--brand); font-weight: 600; font-size: 0.83rem; padding: 0.2rem 0.4rem; }
+    .btn-link.danger { color: var(--danger); }
+    .btn-link:hover { text-decoration: underline; }
+    .btn-remove { border: none; background: transparent; color: var(--muted); cursor: pointer; font-size: 0.85rem; }
+    .btn-remove:hover { color: var(--danger); }
+    .text-right { text-align: right; }
+    .row-actions { text-align: right; white-space: nowrap; display: flex; gap: 0.6rem; justify-content: flex-end; }
+    .row-inactive { opacity: 0.55; }
+    .muted { color: var(--muted); font-size: 0.85rem; }
+
+    .form-card { margin-bottom: 1.5rem; }
+    .form-card h3 { margin-bottom: 1rem; }
+    .form-card h4 { font-size: 0.88rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; margin: 1.25rem 0 0.75rem; }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+    @@media (max-width: 700px) {
+        .field-row { grid-template-columns: 1fr; }
+    }
+    .field label { display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 0.35rem; }
+    .field input, .field select {
+        width: 100%; padding: 0.55rem 0.7rem; border: 1px solid var(--line-strong); border-radius: 8px; font-size: 0.88rem; box-sizing: border-box;
+    }
+    .picker-row { display: flex; align-items: flex-end; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .field-grow { flex: 1; min-width: 220px; }
+
+    .stop-table { margin-bottom: 1rem; }
+    .day-toggles { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+    .day-chip {
+        display: inline-flex; align-items: center; gap: 0.2rem; font-size: 0.72rem; font-weight: 600;
+        padding: 0.2rem 0.45rem; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); cursor: pointer;
+    }
+    .day-chip input { width: auto !important; margin: 0; }
+    .day-chip.active { background: var(--brand-soft); color: var(--brand); border-color: var(--brand); }
+
+    .modal-actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 1.25rem; }
+</style>
+
+@code {
+    private List<SalesRoute>? routes;
+    private List<SalesRep>? reps;
+    private List<Customer>? customers;
+    private List<Distributor>? distributors;
+    private string? errorMessage;
+
+    private bool showForm;
+    private string? editingCode;
+    private string routeName = "";
+    private int selectedRepId;
+    private StopType pickerStopType = StopType.Customer;
+    private int pickerTargetId;
+    private List<RouteStop> stops = [];
+    private string? formError;
+    private bool saving;
+
+    private static readonly (VisitDays Value, string Label)[] AllDays =
+    [
+        (VisitDays.Mon, "T2"), (VisitDays.Tue, "T3"), (VisitDays.Wed, "T4"), (VisitDays.Thu, "T5"),
+        (VisitDays.Fri, "T6"), (VisitDays.Sat, "T7"), (VisitDays.Sun, "CN")
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRoutes();
+    }
+
+    private async Task LoadRoutes()
+    {
+        try
+        {
+            routes = await Api.GetRoutesAsync();
+        }
+        catch
+        {
+            errorMessage = "Không tải được danh sách tuyến. Kiểm tra kết nối tới máy chủ.";
+        }
+    }
+
+    private async Task OpenCreateForm()
+    {
+        editingCode = null;
+        routeName = "";
+        stops = [];
+        formError = null;
+        showForm = true;
+        await LoadFormData();
+        selectedRepId = reps?.FirstOrDefault()?.Id ?? 0;
+    }
+
+    private async Task OpenEditForm(SalesRoute r)
+    {
+        editingCode = r.RouteCode;
+        routeName = r.Name;
+        selectedRepId = r.SalesRepId;
+        stops = r.Stops.Select(s => new RouteStop
+        {
+            StopType = s.StopType,
+            CustomerId = s.CustomerId,
+            DistributorId = s.DistributorId,
+            StopName = s.StopName,
+            VisitDays = s.VisitDays
+        }).ToList();
+        formError = null;
+        showForm = true;
+        await LoadFormData();
+    }
+
+    private async Task LoadFormData()
+    {
+        reps = await Api.GetSalesRepsAsync();
+        customers = await Api.GetCustomersAsync();
+        distributors = await Api.GetDistributorsAsync();
+        pickerTargetId = customers?.FirstOrDefault()?.Id ?? 0;
+    }
+
+    private void AddStop()
+    {
+        if (pickerTargetId == 0) return;
+
+        var name = pickerStopType == StopType.Customer
+            ? customers?.FirstOrDefault(c => c.Id == pickerTargetId)?.Name
+            : distributors?.FirstOrDefault(d => d.Id == pickerTargetId)?.Name;
+        if (name is null) return;
+
+        stops.Add(new RouteStop
+        {
+            StopType = pickerStopType,
+            CustomerId = pickerStopType == StopType.Customer ? pickerTargetId : null,
+            DistributorId = pickerStopType == StopType.Distributor ? pickerTargetId : null,
+            StopName = name,
+            VisitDays = VisitDays.None
+        });
+    }
+
+    private string StopName(RouteStop stop) => stop.StopName;
+
+    private void ToggleDay(RouteStop stop, VisitDays day, bool isChecked)
+    {
+        stop.VisitDays = isChecked ? stop.VisitDays | day : stop.VisitDays & ~day;
+    }
+
+    private async Task SaveRoute()
+    {
+        formError = null;
+
+        if (string.IsNullOrWhiteSpace(routeName))
+        {
+            formError = "Vui lòng nhập tên tuyến.";
+            return;
+        }
+        if (stops.Any(s => s.VisitDays == VisitDays.None))
+        {
+            formError = "Mỗi điểm dừng cần chọn ít nhất 1 ngày ghé trong tuần.";
+            return;
+        }
+
+        saving = true;
+        var request = new SaveRouteRequest
+        {
+            Name = routeName.Trim(),
+            SalesRepId = selectedRepId,
+            Stops = stops.Select(s => new RouteStopInput
+            {
+                StopType = s.StopType,
+                TargetId = s.StopType == StopType.Customer ? s.CustomerId ?? 0 : s.DistributorId ?? 0,
+                VisitDays = s.VisitDays
+            }).ToList()
+        };
+
+        var (success, error) = editingCode is null
+            ? await Api.CreateRouteAsync(request)
+            : await Api.UpdateRouteAsync(editingCode, request);
+        saving = false;
+
+        if (!success)
+        {
+            formError = error ?? "Không thể lưu tuyến.";
+            return;
+        }
+
+        showForm = false;
+        await LoadRoutes();
+    }
+
+    private async Task Deactivate(string code)
+    {
+        await Api.DeactivateRouteAsync(code);
+        await LoadRoutes();
+    }
+}
