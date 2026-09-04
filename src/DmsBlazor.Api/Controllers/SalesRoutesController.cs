@@ -87,7 +87,10 @@ public class SalesRoutesController(DmsDbContext db) : ControllerBase
     {
         var vnNow = DateTimeOffset.UtcNow.ToOffset(TimeSpan.FromHours(7));
         var todayFlag = DayOfWeekToVisitDays(vnNow.DayOfWeek);
-        var todayStart = new DateTimeOffset(vnNow.Year, vnNow.Month, vnNow.Day, 0, 0, 0, TimeSpan.FromHours(7));
+        // Npgsql chỉ chấp nhận DateTimeOffset offset=0 (UTC) khi ghi/so sánh với cột
+        // "timestamp with time zone" — tính mốc 00:00 giờ VN rồi đổi sang UTC trước
+        // khi dùng trong query, KHÔNG truyền thẳng DateTimeOffset offset +7 vào EF Core.
+        var todayStart = new DateTimeOffset(vnNow.Year, vnNow.Month, vnNow.Day, 0, 0, 0, TimeSpan.FromHours(7)).ToUniversalTime();
 
         var routes = await db.SalesRoutes
             .Include(r => r.Stops.OrderBy(s => s.SortOrder))
