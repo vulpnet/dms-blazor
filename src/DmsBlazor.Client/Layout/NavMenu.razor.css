@@ -52,14 +52,52 @@
     overflow-y: auto;
 }
 
-.nav-group-label {
+.nav-group {
+    margin-top: 0.4rem;
+}
+
+.nav-group-head {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-align: left;
+    padding: 0.5rem 0.6rem;
     font-size: 0.7rem;
     font-weight: 650;
     text-transform: uppercase;
     letter-spacing: 0.06em;
     color: var(--muted, #64748b);
-    padding: 0 0.6rem;
-    margin: 0.25rem 0 0.5rem;
+    border-radius: 8px;
+}
+
+.nav-group-head:hover {
+    background: var(--canvas, #f4f6f9);
+}
+
+.nav-group-head .chev {
+    transition: transform 0.15s ease;
+    font-size: 0.6rem;
+    display: inline-block;
+}
+
+.nav-group-head.open .chev {
+    transform: rotate(90deg);
+}
+
+.nav-group-items {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height 0.25s ease;
+}
+
+.nav-group-items.open {
+    max-height: 1000px;
 }
 
 .nav-item {
