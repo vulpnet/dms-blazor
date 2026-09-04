@@ -50,13 +50,23 @@ else if (reps.Count == 0)
 }
 else
 {
+    <div class="filter-bar">
+        <input class="filter-search" @bind="searchText" @bind:event="oninput" placeholder="Tìm theo tên, SĐT..." />
+    </div>
+
+    @if (FilteredReps.Count == 0)
+    {
+        <p class="muted">Không có nhân viên nào khớp bộ lọc.</p>
+    }
+    else
+    {
     <div class="card">
         <table class="data-table">
             <thead>
                 <tr><th>Họ tên</th><th>Điện thoại</th><th></th></tr>
             </thead>
             <tbody>
-                @foreach (var r in reps)
+                @foreach (var r in FilteredReps)
                 {
                     <tr>
                         <td>@r.Name</td>
@@ -70,10 +80,13 @@ else
             </tbody>
         </table>
     </div>
+    }
 }
 
 <style>
     .page-header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
+    .filter-bar { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .filter-search { flex: 1; min-width: 220px; padding: 0.55rem 0.8rem; border: 1px solid var(--line-strong); border-radius: 8px; font-size: 0.88rem; }
     .btn-primary {
         background: var(--brand); color: #fff; border: none; border-radius: 8px;
         padding: 0.6rem 1.2rem; font-weight: 600; cursor: pointer; font-size: 0.85rem;
@@ -104,6 +117,13 @@ else
     private SalesRep? editing;
     private bool saving;
     private string? formError;
+    private string searchText = "";
+
+    private List<SalesRep> FilteredReps => (reps ?? [])
+        .Where(r => string.IsNullOrWhiteSpace(searchText)
+            || r.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase)
+            || r.Phone.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+        .ToList();
 
     protected override async Task OnInitializedAsync()
     {

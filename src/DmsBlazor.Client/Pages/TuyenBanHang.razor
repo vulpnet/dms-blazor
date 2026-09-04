@@ -141,13 +141,28 @@ else if (routes.Count == 0)
 }
 else
 {
+    <div class="filter-bar">
+        <input class="filter-search" @bind="searchText" @bind:event="oninput" placeholder="Tìm theo mã tuyến, tên tuyến, nhân viên..." />
+        <select class="filter-select" @bind="statusFilter">
+            <option value="">Tất cả trạng thái</option>
+            <option value="active">Đang dùng</option>
+            <option value="inactive">Ngừng dùng</option>
+        </select>
+    </div>
+
+    @if (FilteredRoutes.Count == 0)
+    {
+        <p class="muted">Không có tuyến nào khớp bộ lọc.</p>
+    }
+    else
+    {
     <div class="card">
         <table class="data-table">
             <thead>
                 <tr><th>Mã tuyến</th><th>Tên tuyến</th><th>Nhân viên</th><th class="text-right">Số điểm dừng</th><th></th></tr>
             </thead>
             <tbody>
-                @foreach (var r in routes)
+                @foreach (var r in FilteredRoutes)
                 {
                     <tr class="@(r.IsActive ? "" : "row-inactive")">
                         <td><code>@r.RouteCode</code></td>
@@ -166,10 +181,14 @@ else
             </tbody>
         </table>
     </div>
+    }
 }
 
 <style>
     .page-header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
+    .filter-bar { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .filter-search { flex: 1; min-width: 220px; padding: 0.55rem 0.8rem; border: 1px solid var(--line-strong); border-radius: 8px; font-size: 0.88rem; }
+    .filter-select { padding: 0.55rem 0.8rem; border: 1px solid var(--line-strong); border-radius: 8px; font-size: 0.88rem; }
     .btn-primary {
         background: var(--brand); color: #fff; border: none; border-radius: 8px;
         padding: 0.6rem 1.2rem; font-weight: 600; cursor: pointer; font-size: 0.85rem;
@@ -231,6 +250,21 @@ else
     private List<RouteStop> stops = [];
     private string? formError;
     private bool saving;
+    private string searchText = "";
+    private string statusFilter = "";
+
+    private List<SalesRoute> FilteredRoutes => (routes ?? [])
+        .Where(r => string.IsNullOrWhiteSpace(searchText)
+            || r.RouteCode.Contains(searchText, StringComparison.OrdinalIgnoreCase)
+            || r.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase)
+            || r.SalesRepName.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+        .Where(r => statusFilter switch
+        {
+            "active" => r.IsActive,
+            "inactive" => !r.IsActive,
+            _ => true
+        })
+        .ToList();
 
     private static readonly (VisitDays Value, string Label)[] AllDays =
     [

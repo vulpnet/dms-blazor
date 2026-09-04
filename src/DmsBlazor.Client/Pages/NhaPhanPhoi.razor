@@ -29,6 +29,21 @@ else if (distributors.Count == 0)
 }
 else
 {
+    <div class="filter-bar">
+        <input class="filter-search" @bind="searchText" @bind:event="oninput" placeholder="Tìm theo tên, khu vực..." />
+        <select class="filter-select" @bind="statusFilter">
+            <option value="">Tất cả trạng thái</option>
+            <option value="active">Đang hợp tác</option>
+            <option value="inactive">Ngừng hợp tác</option>
+        </select>
+    </div>
+
+    @if (FilteredDistributors.Count == 0)
+    {
+        <p class="muted">Không có nhà phân phối nào khớp bộ lọc.</p>
+    }
+    else
+    {
     <div class="card">
         <table class="data-table">
             <thead>
@@ -40,7 +55,7 @@ else
                 </tr>
             </thead>
             <tbody>
-                @foreach (var d in distributors)
+                @foreach (var d in FilteredDistributors)
                 {
                     <tr class="@(d.IsActive ? "" : "row-inactive")">
                         <td>@d.Name</td>
@@ -60,6 +75,7 @@ else
             </tbody>
         </table>
     </div>
+    }
 }
 
 @if (showForm)
@@ -119,6 +135,9 @@ else
 
 <style>
     .page-header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
+    .filter-bar { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .filter-search { flex: 1; min-width: 220px; padding: 0.55rem 0.8rem; border: 1px solid var(--line-strong); border-radius: 8px; font-size: 0.88rem; }
+    .filter-select { padding: 0.55rem 0.8rem; border: 1px solid var(--line-strong); border-radius: 8px; font-size: 0.88rem; }
     .row-actions { white-space: nowrap; text-align: right; }
     .row-inactive { opacity: 0.55; }
     .btn-link {
@@ -178,6 +197,20 @@ else
     private bool saving;
 
     private Distributor? confirmingDelete;
+    private string searchText = "";
+    private string statusFilter = "";
+
+    private List<Distributor> FilteredDistributors => (distributors ?? [])
+        .Where(d => string.IsNullOrWhiteSpace(searchText)
+            || d.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase)
+            || d.Region.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+        .Where(d => statusFilter switch
+        {
+            "active" => d.IsActive,
+            "inactive" => !d.IsActive,
+            _ => true
+        })
+        .ToList();
 
     protected override async Task OnInitializedAsync()
     {

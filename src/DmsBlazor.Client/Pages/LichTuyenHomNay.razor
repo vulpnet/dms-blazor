@@ -41,13 +41,29 @@ else
     }
     else
     {
+        <div class="filter-bar">
+            <input class="filter-search" @bind="searchText" @bind:event="oninput" placeholder="Tìm theo tên điểm bán, mã tuyến..." />
+            <select class="filter-select" @bind="statusFilter">
+                <option value="">Tất cả trạng thái</option>
+                <option value="@nameof(VisitStatus.NotVisited)">Chưa ghé</option>
+                <option value="@nameof(VisitStatus.VisitedNoOrder)">Đã ghé, không đặt</option>
+                <option value="@nameof(VisitStatus.Ordered)">Đã đặt đơn</option>
+            </select>
+        </div>
+
+        @if (FilteredStops.Count == 0)
+        {
+            <p class="muted">Không có điểm dừng nào khớp bộ lọc.</p>
+        }
+        else
+        {
         <div class="card">
             <table class="data-table">
                 <thead>
                     <tr><th></th><th>Điểm bán</th><th>Tuyến</th><th>Loại</th><th>Trạng thái</th><th></th></tr>
                 </thead>
                 <tbody>
-                    @foreach (var (stop, index) in stops.Select((s, i) => (s, i)))
+                    @foreach (var (stop, index) in FilteredStops.Select((s, i) => (s, i)))
                     {
                         <tr class="clickable-row @(stop.Status != VisitStatus.NotVisited ? "row-done" : "")" @onclick="() => ToggleRouteDetail(stop.RouteCode)">
                             <td>@(index + 1)</td>
@@ -73,6 +89,7 @@ else
                 </tbody>
             </table>
         </div>
+        }
     }
 }
 
@@ -173,6 +190,10 @@ else
     .clickable-row { cursor: pointer; }
     .clickable-row:hover { background: var(--canvas, #f4f6f9); }
 
+    .filter-bar { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .filter-search { flex: 1; min-width: 220px; padding: 0.55rem 0.8rem; border: 1px solid var(--line-strong); border-radius: 8px; font-size: 0.88rem; }
+    .filter-select { padding: 0.55rem 0.8rem; border: 1px solid var(--line-strong); border-radius: 8px; font-size: 0.88rem; }
+
     .modal-backdrop {
         position: fixed; inset: 0; background: rgba(15,23,42,0.45);
         display: flex; align-items: center; justify-content: center; padding: 1rem; z-index: 50;
@@ -204,6 +225,16 @@ else
     private bool marking;
 
     private string? detailRouteCode;
+    private string searchText = "";
+    private string statusFilter = "";
+
+    private List<TodayStop> FilteredStops => (stops ?? [])
+        .Where(s => string.IsNullOrWhiteSpace(searchText)
+            || s.StopName.Contains(searchText, StringComparison.OrdinalIgnoreCase)
+            || s.RouteCode.Contains(searchText, StringComparison.OrdinalIgnoreCase)
+            || s.RouteName.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+        .Where(s => string.IsNullOrEmpty(statusFilter) || s.Status.ToString() == statusFilter)
+        .ToList();
 
     private IEnumerable<TodayStop> DetailOrderedStops => (stops ?? [])
         .Where(s => s.RouteCode == detailRouteCode && s.Status == VisitStatus.Ordered)

@@ -92,6 +92,22 @@ else
     }
     else
     {
+        <div class="filter-bar">
+            <input class="filter-search" @bind="searchText" @bind:event="oninput" placeholder="Tìm theo mã chuyến, tài xế..." />
+            <select class="filter-select" @bind="statusFilter">
+                <option value="">Tất cả trạng thái</option>
+                <option value="@nameof(TripStatus.Planning)">Đang gom đơn</option>
+                <option value="@nameof(TripStatus.OnTheWay)">Đang giao</option>
+                <option value="@nameof(TripStatus.Completed)">Hoàn tất</option>
+            </select>
+        </div>
+
+        @if (FilteredTrips.Count == 0)
+        {
+            <p class="muted">Không có chuyến giao nào khớp bộ lọc.</p>
+        }
+        else
+        {
         <div class="card">
             <table class="data-table">
                 <thead>
@@ -105,7 +121,7 @@ else
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var t in trips)
+                    @foreach (var t in FilteredTrips)
                     {
                         <tr>
                             <td><code>@t.TripCode</code></td>
@@ -119,6 +135,7 @@ else
                 </tbody>
             </table>
         </div>
+        }
     }
 }
 
@@ -144,6 +161,10 @@ else
     .channel-badge.ontheway { background: var(--brand-soft); color: var(--brand); }
     .channel-badge.completed { background: var(--success-soft); color: var(--success); }
 
+    .filter-bar { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .filter-search { flex: 1; min-width: 220px; padding: 0.55rem 0.8rem; border: 1px solid var(--line-strong); border-radius: 8px; font-size: 0.88rem; }
+    .filter-select { padding: 0.55rem 0.8rem; border: 1px solid var(--line-strong); border-radius: 8px; font-size: 0.88rem; }
+
     .create-form { margin-bottom: 1.5rem; }
     .create-form h3 { margin-bottom: 1rem; }
     .field { margin-bottom: 1rem; max-width: 340px; }
@@ -161,6 +182,15 @@ else
     private HashSet<int> selectedOrderIds = [];
     private bool creating;
     private string? createError;
+    private string searchText = "";
+    private string statusFilter = "";
+
+    private List<DeliveryTrip> FilteredTrips => (trips ?? [])
+        .Where(t => string.IsNullOrWhiteSpace(searchText)
+            || t.TripCode.Contains(searchText, StringComparison.OrdinalIgnoreCase)
+            || t.DriverName.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+        .Where(t => string.IsNullOrEmpty(statusFilter) || t.Status.ToString() == statusFilter)
+        .ToList();
 
     protected override async Task OnInitializedAsync()
     {
