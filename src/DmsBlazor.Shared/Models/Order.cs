@@ -64,6 +64,7 @@ public class Order
     public int Id { get; set; }
     public string OrderCode { get; set; } = "";      // vd DH-2026-0001, tăng dần theo năm
     public SalesChannel Channel { get; set; }
+    public int? DistributorId { get; set; }            // chỉ có ở kênh Npp — dùng để xác định kho đích khi giao hàng
     public string? DistributorName { get; set; }      // snapshot tên NPP, chỉ có ở kênh Npp
     public string? CustomerName { get; set; }          // snapshot tên khách lẻ, chỉ có ở kênh Retail
     public string? CustomerPhone { get; set; }

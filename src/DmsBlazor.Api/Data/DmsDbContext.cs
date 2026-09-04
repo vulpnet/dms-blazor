@@ -17,6 +17,9 @@ public class DmsDbContext(DbContextOptions<DmsDbContext> options) : DbContext(op
     public DbSet<SalesRoute> SalesRoutes => Set<SalesRoute>();
     public DbSet<RouteStop> RouteStops => Set<RouteStop>();
     public DbSet<RouteVisitLog> RouteVisitLogs => Set<RouteVisitLog>();
+    public DbSet<Warehouse> Warehouses => Set<Warehouse>();
+    public DbSet<InventoryStock> InventoryStocks => Set<InventoryStock>();
+    public DbSet<InventoryTransaction> InventoryTransactions => Set<InventoryTransaction>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -72,6 +75,7 @@ public class DmsDbContext(DbContextOptions<DmsDbContext> options) : DbContext(op
             e.HasIndex(x => x.TripCode).IsUnique();
             e.Property(x => x.DriverName).HasMaxLength(200).IsRequired();
             e.Property(x => x.VehiclePlate).HasMaxLength(30);
+            e.Property(x => x.SourceWarehouseName).HasMaxLength(200);
             e.HasMany(x => x.Orders).WithOne().HasForeignKey(o => o.DeliveryTripId).OnDelete(DeleteBehavior.SetNull);
         });
 
@@ -143,6 +147,33 @@ public class DmsDbContext(DbContextOptions<DmsDbContext> options) : DbContext(op
             // 1 điểm dừng chỉ ghi 1 log/ngày — bấm "Đánh dấu đã ghé" lần 2 trong
             // cùng ngày là cập nhật lại log cũ, không tạo bản ghi trùng.
             e.HasIndex(x => new { x.RouteStopId, x.VisitDate }).IsUnique();
+        });
+
+        modelBuilder.Entity<Warehouse>(e =>
+        {
+            e.ToTable("warehouses");
+            e.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            // 1 NPP chỉ có tối đa 1 kho — NULL (Kho tổng) không bị ràng buộc unique.
+            e.HasIndex(x => x.DistributorId).IsUnique().HasFilter("\"DistributorId\" IS NOT NULL");
+        });
+
+        modelBuilder.Entity<InventoryStock>(e =>
+        {
+            e.ToTable("inventory_stocks");
+            e.Property(x => x.WarehouseName).HasMaxLength(200);
+            e.Property(x => x.ProductCode).HasMaxLength(50);
+            e.Property(x => x.ProductName).HasMaxLength(200);
+            e.Property(x => x.Unit).HasMaxLength(30);
+            e.HasIndex(x => new { x.WarehouseId, x.ProductId }).IsUnique();
+        });
+
+        modelBuilder.Entity<InventoryTransaction>(e =>
+        {
+            e.ToTable("inventory_transactions");
+            e.Property(x => x.WarehouseName).HasMaxLength(200);
+            e.Property(x => x.ProductName).HasMaxLength(200);
+            e.Property(x => x.Note).HasMaxLength(500);
+            e.Property(x => x.RefCode).HasMaxLength(30);
         });
     }
 }

@@ -55,6 +55,7 @@ public class OrdersController(DmsDbContext db) : ControllerBase
         {
             OrderCode = await OrderCodeGenerator.NextAsync(db),
             Channel = request.Channel,
+            DistributorId = request.Channel == SalesChannel.Npp ? request.DistributorId : null,
             DistributorName = distributorName,
             CustomerName = customerName,
             CustomerPhone = customerPhone,
@@ -68,6 +69,23 @@ public class OrdersController(DmsDbContext db) : ControllerBase
         };
 
         db.Orders.Add(order);
+
+        // Trừ tồn Kho tổng ngay khi đơn được xác nhận, quy đổi về đơn vị lẻ thống
+        // nhất — kênh NPP đặt theo thùng (Product.CaseSize đơn vị/thùng), kênh Retail
+        // đặt trực tiếp theo đơn vị lẻ. Không chặn nếu tồn không đủ (âm kho vẫn cho
+        // đặt) — chỉ ghi nhận đúng số liệu để cảnh báo qua màn hình tồn kho.
+        var centralWarehouseId = await db.Warehouses
+            .Where(w => w.Type == WarehouseType.Central)
+            .Select(w => w.Id)
+            .FirstAsync();
+
+        foreach (var line in priced.Lines)
+        {
+            var unitQty = request.Channel == SalesChannel.Npp ? line.Qty * line.Product.CaseSize : line.Qty;
+            await InventoryService.ApplyAsync(db, centralWarehouseId, line.Product.Id, -unitQty,
+                InventoryTransactionType.OrderReserved, refCode: order.OrderCode);
+        }
+
         await db.SaveChangesAsync();
 
         return CreatedAtAction(nameof(GetByCode), new { code = order.OrderCode }, order);

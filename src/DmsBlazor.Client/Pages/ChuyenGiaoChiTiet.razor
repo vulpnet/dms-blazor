@@ -83,6 +83,27 @@ else
     <div class="modal-backdrop" @onclick="() => markingOrder = null">
         <div class="modal-panel" @onclick:stopPropagation="true">
             <h3>Cập nhật giao hàng — @markingOrder.OrderCode</h3>
+
+            @if (markingOrder.Channel == SalesChannel.Retail)
+            {
+                <div class="field">
+                    <label for="dest-warehouse">Kho/NPP nhận hàng</label>
+                    <select id="dest-warehouse" @bind="destinationWarehouseId">
+                        @if (warehouses is null)
+                        {
+                            <option value="0">Đang tải...</option>
+                        }
+                        else
+                        {
+                            @foreach (var w in warehouses)
+                            {
+                                <option value="@w.Id">@w.Name</option>
+                            }
+                        }
+                    </select>
+                </div>
+            }
+
             <div class="modal-actions">
                 <button class="btn-outline" @onclick="() => SubmitMark(true)">✅ Giao thành công</button>
                 <button class="btn-danger" @onclick="() => showFailReason = true">❌ Giao thất bại</button>
@@ -146,7 +167,7 @@ else
     .modal-actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 1rem; flex-wrap: wrap; }
     .field { margin-top: 1rem; }
     .field label { display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 0.4rem; }
-    .field input { width: 100%; padding: 0.55rem 0.7rem; border: 1px solid var(--line-strong); border-radius: 8px; font-size: 0.88rem; box-sizing: border-box; }
+    .field input, .field select { width: 100%; padding: 0.55rem 0.7rem; border: 1px solid var(--line-strong); border-radius: 8px; font-size: 0.88rem; box-sizing: border-box; }
 </style>
 
 @code {
@@ -158,6 +179,8 @@ else
     private Order? markingOrder;
     private bool showFailReason;
     private string failureReason = "";
+    private List<Warehouse>? warehouses;
+    private int destinationWarehouseId;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -181,11 +204,20 @@ else
         await Reload();
     }
 
-    private void OpenMarkForm(Order order)
+    private async Task OpenMarkForm(Order order)
     {
         markingOrder = order;
         showFailReason = false;
         failureReason = "";
+
+        if (order.Channel == SalesChannel.Retail && warehouses is null)
+        {
+            // Chỉ cho chọn kho NPP làm đích — kho tổng là nơi hàng XUẤT ra, không
+            // hợp lý nếu chọn ngược lại làm nơi NHẬN khi giao cho khách lẻ.
+            var all = await Api.GetWarehousesAsync() ?? [];
+            warehouses = all.Where(w => w.Type == WarehouseType.Distributor).ToList();
+            destinationWarehouseId = warehouses.FirstOrDefault()?.Id ?? 0;
+        }
     }
 
     private async Task SubmitMark(bool success)
@@ -196,7 +228,8 @@ else
         var (ok, error) = await Api.MarkDeliveredAsync(Code, markingOrder.Id, new MarkDeliveredRequest
         {
             Success = success,
-            FailureReason = success ? null : failureReason
+            FailureReason = success ? null : failureReason,
+            DestinationWarehouseId = markingOrder.Channel == SalesChannel.Retail ? destinationWarehouseId : null
         });
 
         if (!ok) { actionError = error ?? "Không thể cập nhật trạng thái giao hàng."; return; }

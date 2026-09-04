@@ -245,4 +245,35 @@ public class DmsApiClient(HttpClient http)
         var res = await http.PostAsJsonAsync($"api/salesroutes/stops/{routeStopId}/mark-visited", request);
         return res.IsSuccessStatusCode;
     }
+
+    // ===== Tồn kho: kho + nhập/điều chỉnh/xem tồn =====
+
+    public Task<List<Warehouse>?> GetWarehousesAsync() =>
+        http.GetFromJsonAsync<List<Warehouse>>("api/warehouses");
+
+    public Task<List<InventoryStock>?> GetStocksAsync(int? warehouseId = null) =>
+        http.GetFromJsonAsync<List<InventoryStock>>(warehouseId.HasValue ? $"api/inventory/stocks?warehouseId={warehouseId}" : "api/inventory/stocks");
+
+    public Task<List<InventoryTransaction>?> GetTransactionsAsync(int? warehouseId = null, int? productId = null)
+    {
+        var query = new List<string>();
+        if (warehouseId.HasValue) query.Add($"warehouseId={warehouseId}");
+        if (productId.HasValue) query.Add($"productId={productId}");
+        var qs = query.Count > 0 ? "?" + string.Join("&", query) : "";
+        return http.GetFromJsonAsync<List<InventoryTransaction>>($"api/inventory/transactions{qs}");
+    }
+
+    public async Task<(bool Success, string? Error)> StockInAsync(StockInRequest request)
+    {
+        var res = await http.PostAsJsonAsync("api/inventory/stock-in", request);
+        if (res.IsSuccessStatusCode) return (true, null);
+        return (false, await res.Content.ReadAsStringAsync());
+    }
+
+    public async Task<(bool Success, string? Error)> AdjustStockAsync(AdjustStockRequest request)
+    {
+        var res = await http.PostAsJsonAsync("api/inventory/adjust", request);
+        if (res.IsSuccessStatusCode) return (true, null);
+        return (false, await res.Content.ReadAsStringAsync());
+    }
 }

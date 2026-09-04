@@ -1,0 +1,315 @@
+@page "/ton-kho"
+@using DmsBlazor.Shared.Models
+@using DmsBlazor.Client.Services
+@inject DmsApiClient Api
+
+<PageTitle>Tồn kho — DMS</PageTitle>
+
+<div class="page-header page-header-row">
+    <div>
+        <h1>Tồn kho</h1>
+        <p>Tồn kho theo Kho tổng và từng Nhà phân phối — cập nhật tự động theo đơn hàng/chuyến giao, hoặc nhập/điều chỉnh thủ công.</p>
+    </div>
+    <div class="header-actions">
+        <button class="btn-outline" @onclick="OpenStockInForm">+ Nhập hàng</button>
+        <button class="btn-outline" @onclick="OpenAdjustForm">Điều chỉnh kiểm kho</button>
+    </div>
+</div>
+
+@if (warehouses is null || products is null)
+{
+    <div class="skeleton-row"><div class="skeleton-card"></div></div>
+}
+else
+{
+    <div class="field">
+        <label for="warehouse-select">Xem tồn kho tại</label>
+        <select id="warehouse-select" @bind="selectedWarehouseId" @bind:after="LoadStocks">
+            @foreach (var w in warehouses)
+            {
+                <option value="@w.Id">@w.Name</option>
+            }
+        </select>
+    </div>
+
+    <div class="filter-bar">
+        <input class="filter-search" @bind="searchText" @bind:event="oninput" placeholder="Tìm theo mã, tên sản phẩm..." />
+    </div>
+
+    @if (stocks is null)
+    {
+        <div class="skeleton-row"><div class="skeleton-card"></div></div>
+    }
+    else if (FilteredStocks.Count == 0)
+    {
+        <p class="muted">Chưa có tồn kho nào tại kho này.</p>
+    }
+    else
+    {
+        <div class="card">
+            <table class="data-table">
+                <thead>
+                    <tr><th></th><th>Mã</th><th>Tên sản phẩm</th><th class="text-right">Tồn kho</th><th>Đơn vị</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var s in FilteredStocks)
+                    {
+                        <tr class="@(s.Quantity < 0 ? "row-negative" : "")">
+                            <td>@s.Emoji</td>
+                            <td><code>@s.ProductCode</code></td>
+                            <td>@s.ProductName</td>
+                            <td class="text-right">@s.Quantity.ToString("N0")</td>
+                            <td>@s.Unit</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+}
+
+@if (showStockInForm)
+{
+    <div class="modal-backdrop" @onclick="() => showStockInForm = false">
+        <div class="modal-panel" @onclick:stopPropagation="true">
+            <h3>Nhập hàng</h3>
+            <div class="field">
+                <label for="in-warehouse">Kho nhập</label>
+                <select id="in-warehouse" @bind="formWarehouseId">
+                    @foreach (var w in warehouses ?? [])
+                    {
+                        <option value="@w.Id">@w.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="field">
+                <label for="in-product">Sản phẩm</label>
+                <select id="in-product" @bind="formProductId">
+                    @foreach (var p in products ?? [])
+                    {
+                        <option value="@p.Id">@p.Emoji @p.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="field">
+                <label for="in-qty">Số lượng nhập (đơn vị lẻ)</label>
+                <input id="in-qty" type="number" min="1" @bind="formQuantity" />
+            </div>
+            <div class="field">
+                <label for="in-note">Ghi chú (tuỳ chọn)</label>
+                <input id="in-note" @bind="formNote" placeholder="vd: Nhập theo PO-2026-014" />
+            </div>
+
+            @if (formError is not null)
+            {
+                <div class="alert-error">@formError</div>
+            }
+
+            <div class="modal-actions">
+                <button class="btn-outline" @onclick="() => showStockInForm = false">Huỷ</button>
+                <button class="btn-primary" disabled="@saving" @onclick="SubmitStockIn">
+                    @(saving ? "Đang lưu..." : "Nhập hàng")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (showAdjustForm)
+{
+    <div class="modal-backdrop" @onclick="() => showAdjustForm = false">
+        <div class="modal-panel" @onclick:stopPropagation="true">
+            <h3>Điều chỉnh kiểm kho</h3>
+            <p class="muted">Nhập đúng số lượng thực tế đếm được — hệ thống tự tính chênh lệch với tồn hiện tại.</p>
+            <div class="field">
+                <label for="adj-warehouse">Kho</label>
+                <select id="adj-warehouse" @bind="formWarehouseId">
+                    @foreach (var w in warehouses ?? [])
+                    {
+                        <option value="@w.Id">@w.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="field">
+                <label for="adj-product">Sản phẩm</label>
+                <select id="adj-product" @bind="formProductId">
+                    @foreach (var p in products ?? [])
+                    {
+                        <option value="@p.Id">@p.Emoji @p.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="field">
+                <label for="adj-qty">Số lượng thực tế (đơn vị lẻ)</label>
+                <input id="adj-qty" type="number" min="0" @bind="formQuantity" />
+            </div>
+            <div class="field">
+                <label for="adj-note">Lý do điều chỉnh</label>
+                <input id="adj-note" @bind="formNote" placeholder="vd: Kiểm kho định kỳ tháng 9" />
+            </div>
+
+            @if (formError is not null)
+            {
+                <div class="alert-error">@formError</div>
+            }
+
+            <div class="modal-actions">
+                <button class="btn-outline" @onclick="() => showAdjustForm = false">Huỷ</button>
+                <button class="btn-primary" disabled="@saving" @onclick="SubmitAdjust">
+                    @(saving ? "Đang lưu..." : "Điều chỉnh")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .page-header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
+    .header-actions { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+    .btn-outline {
+        border: 1px solid var(--line-strong); color: var(--ink); background: var(--surface);
+        padding: 0.55rem 1rem; border-radius: 8px; font-weight: 600; font-size: 0.85rem; cursor: pointer;
+    }
+    .btn-primary {
+        background: var(--brand); color: #fff; border: none; border-radius: 8px;
+        padding: 0.6rem 1.2rem; font-weight: 600; cursor: pointer; font-size: 0.85rem;
+    }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+    .field { margin-bottom: 1rem; max-width: 340px; }
+    .field label { display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 0.4rem; }
+    .field select, .field input {
+        width: 100%; padding: 0.55rem 0.7rem; border: 1px solid var(--line-strong); border-radius: 8px; font-size: 0.88rem; box-sizing: border-box;
+    }
+    .filter-bar { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .filter-search { flex: 1; min-width: 220px; padding: 0.55rem 0.8rem; border: 1px solid var(--line-strong); border-radius: 8px; font-size: 0.88rem; }
+    .text-right { text-align: right; }
+    .row-negative { background: var(--danger-soft); }
+    .muted { color: var(--muted); font-size: 0.85rem; }
+
+    .modal-backdrop {
+        position: fixed; inset: 0; background: rgba(15,23,42,0.45);
+        display: flex; align-items: center; justify-content: center; padding: 1rem; z-index: 50;
+    }
+    .modal-panel {
+        background: var(--surface); border-radius: var(--radius); padding: 1.5rem;
+        width: 100%; max-width: 420px; max-height: 90vh; overflow-y: auto; box-shadow: var(--shadow-md);
+    }
+    .modal-panel h3 { font-size: 1.05rem; margin-bottom: 0.75rem; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 1.25rem; }
+</style>
+
+@code {
+    private List<Warehouse>? warehouses;
+    private List<Product>? products;
+    private List<InventoryStock>? stocks;
+    private int selectedWarehouseId;
+    private string searchText = "";
+
+    private bool showStockInForm;
+    private bool showAdjustForm;
+    private int formWarehouseId;
+    private int formProductId;
+    private int formQuantity = 1;
+    private string formNote = "";
+    private string? formError;
+    private bool saving;
+
+    private List<InventoryStock> FilteredStocks => (stocks ?? [])
+        .Where(s => string.IsNullOrWhiteSpace(searchText)
+            || s.ProductCode.Contains(searchText, StringComparison.OrdinalIgnoreCase)
+            || s.ProductName.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+        .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        warehouses = await Api.GetWarehousesAsync() ?? [];
+        products = await Api.GetManagedProductsAsync() ?? [];
+        selectedWarehouseId = warehouses.FirstOrDefault(w => w.Type == WarehouseType.Central)?.Id ?? warehouses.FirstOrDefault()?.Id ?? 0;
+        await LoadStocks();
+    }
+
+    private async Task LoadStocks()
+    {
+        stocks = null;
+        if (selectedWarehouseId == 0) return;
+        stocks = await Api.GetStocksAsync(selectedWarehouseId);
+    }
+
+    private void OpenStockInForm()
+    {
+        formError = null;
+        formWarehouseId = warehouses?.FirstOrDefault(w => w.Type == WarehouseType.Central)?.Id ?? 0;
+        formProductId = products?.FirstOrDefault()?.Id ?? 0;
+        formQuantity = 1;
+        formNote = "";
+        showStockInForm = true;
+    }
+
+    private void OpenAdjustForm()
+    {
+        formError = null;
+        formWarehouseId = selectedWarehouseId;
+        formProductId = products?.FirstOrDefault()?.Id ?? 0;
+        formQuantity = 0;
+        formNote = "";
+        showAdjustForm = true;
+    }
+
+    private async Task SubmitStockIn()
+    {
+        formError = null;
+        if (formQuantity <= 0)
+        {
+            formError = "Số lượng nhập phải lớn hơn 0.";
+            return;
+        }
+
+        saving = true;
+        var (success, error) = await Api.StockInAsync(new StockInRequest
+        {
+            WarehouseId = formWarehouseId,
+            ProductId = formProductId,
+            Quantity = formQuantity,
+            Note = formNote
+        });
+        saving = false;
+
+        if (!success)
+        {
+            formError = error ?? "Không thể nhập hàng.";
+            return;
+        }
+
+        showStockInForm = false;
+        await LoadStocks();
+    }
+
+    private async Task SubmitAdjust()
+    {
+        formError = null;
+        if (string.IsNullOrWhiteSpace(formNote))
+        {
+            formError = "Vui lòng nhập lý do điều chỉnh.";
+            return;
+        }
+
+        saving = true;
+        var (success, error) = await Api.AdjustStockAsync(new AdjustStockRequest
+        {
+            WarehouseId = formWarehouseId,
+            ProductId = formProductId,
+            ActualQuantity = formQuantity,
+            Note = formNote
+        });
+        saving = false;
+
+        if (!success)
+        {
+            formError = error ?? "Không thể điều chỉnh tồn kho.";
+            return;
+        }
+
+        showAdjustForm = false;
+        await LoadStocks();
+    }
+}

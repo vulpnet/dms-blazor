@@ -41,6 +41,11 @@ public static class DbInitializer
             }));
         }
 
+        if (!await db.Warehouses.AnyAsync(w => w.Type == Shared.Models.WarehouseType.Central))
+        {
+            db.Warehouses.Add(new Shared.Models.Warehouse { Name = "Kho tổng", Type = Shared.Models.WarehouseType.Central });
+        }
+
         await db.SaveChangesAsync();
     }
 }

@@ -51,6 +51,9 @@ public class DeliveryTripsController(DmsDbContext db) : ControllerBase
         var driver = await db.Drivers.FindAsync(request.DriverId);
         if (driver is null) return BadRequest("Không tìm thấy tài xế.");
 
+        var sourceWarehouse = await db.Warehouses.FindAsync(request.SourceWarehouseId);
+        if (sourceWarehouse is null) return BadRequest("Không tìm thấy kho xuất hàng.");
+
         var orders = await db.Orders
             .Where(o => request.OrderIds.Contains(o.Id))
             .ToListAsync();
@@ -65,6 +68,8 @@ public class DeliveryTripsController(DmsDbContext db) : ControllerBase
             DriverId = driver.Id,
             DriverName = driver.Name,
             VehiclePlate = driver.VehiclePlate,
+            SourceWarehouseId = sourceWarehouse.Id,
+            SourceWarehouseName = sourceWarehouse.Name,
             Status = TripStatus.Planning,
             CreatedAt = DateTimeOffset.UtcNow
         };
@@ -101,7 +106,8 @@ public class DeliveryTripsController(DmsDbContext db) : ControllerBase
     [HttpPost("{code}/orders/{orderId:int}/mark-delivered")]
     public async Task<IActionResult> MarkDelivered(string code, int orderId, [FromBody] MarkDeliveredRequest request)
     {
-        var trip = await db.DeliveryTrips.Include(t => t.Orders).FirstOrDefaultAsync(t => t.TripCode == code);
+        var trip = await db.DeliveryTrips.Include(t => t.Orders).ThenInclude(o => o.Lines)
+            .FirstOrDefaultAsync(t => t.TripCode == code);
         if (trip is null) return NotFound();
 
         var order = trip.Orders.FirstOrDefault(o => o.Id == orderId);
@@ -110,12 +116,46 @@ public class DeliveryTripsController(DmsDbContext db) : ControllerBase
         if (!request.Success && string.IsNullOrWhiteSpace(request.FailureReason))
             return BadRequest("Cần nhập lý do khi giao hàng thất bại.");
 
+        int? destinationWarehouseId = null;
+        if (request.Success)
+        {
+            if (order.Channel == SalesChannel.Npp && order.DistributorId.HasValue)
+            {
+                var warehouse = await InventoryService.GetOrCreateDistributorWarehouseAsync(db, order.DistributorId.Value);
+                destinationWarehouseId = warehouse.Id;
+            }
+            else
+            {
+                // Kênh Retail không có NPP mặc định — bắt buộc chọn kho đích khi
+                // đánh dấu giao thành công để biết hàng thực tế đi qua NPP nào.
+                if (!request.DestinationWarehouseId.HasValue)
+                    return BadRequest("Đơn bán lẻ cần chọn kho/NPP đích khi đánh dấu đã giao.");
+
+                var warehouseExists = await db.Warehouses.AnyAsync(w => w.Id == request.DestinationWarehouseId.Value);
+                if (!warehouseExists) return BadRequest("Không tìm thấy kho đích đã chọn.");
+                destinationWarehouseId = request.DestinationWarehouseId.Value;
+            }
+        }
+
         var now = DateTimeOffset.UtcNow;
         if (request.Success)
         {
             order.DeliveryStatus = OrderDeliveryStatus.Delivered;
             order.DeliveredAt = now;
             order.DeliveryFailureReason = null;
+
+            // Chuyển tồn kho: Kho xuất của chuyến đã bị trừ ngay lúc đặt đơn (xem
+            // OrdersController.Confirm) — ở đây chỉ CỘNG vào kho đích, không trừ lại
+            // kho nguồn (tránh trừ 2 lần cùng 1 số lượng).
+            foreach (var line in order.Lines)
+            {
+                var product = await db.Products.FirstOrDefaultAsync(p => p.Code == line.ProductCode);
+                if (product is null) continue; // sản phẩm đã bị xoá sau khi đặt đơn — bỏ qua, không chặn giao hàng
+
+                var unitQty = order.Channel == SalesChannel.Npp ? line.Qty * product.CaseSize : line.Qty;
+                await InventoryService.ApplyAsync(db, destinationWarehouseId!.Value, product.Id, unitQty,
+                    InventoryTransactionType.TripDelivered, refCode: order.OrderCode);
+            }
         }
         else
         {

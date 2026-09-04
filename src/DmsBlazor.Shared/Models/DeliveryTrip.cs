@@ -41,6 +41,12 @@ public class DeliveryTrip
     public DateTimeOffset? DepartedAt { get; set; }
     public DateTimeOffset? CompletedAt { get; set; }
     public List<Order> Orders { get; set; } = [];
+
+    // Kho xuất hàng của cả chuyến — mọi đơn trong chuyến đều lấy hàng từ đây (thường
+    // là Kho tổng). Khi đánh dấu 1 đơn "đã giao", hàng chuyển sang kho đích của
+    // riêng đơn đó (xem Order.DeliveryDestinationWarehouseId).
+    public int SourceWarehouseId { get; set; }
+    public string SourceWarehouseName { get; set; } = "";
 }
 
 public class CreateDriverRequest
@@ -53,6 +59,7 @@ public class CreateDriverRequest
 public class CreateTripRequest
 {
     public int DriverId { get; set; }
+    public int SourceWarehouseId { get; set; }
     public List<int> OrderIds { get; set; } = [];
 }
 
@@ -60,4 +67,7 @@ public class MarkDeliveredRequest
 {
     public bool Success { get; set; }
     public string? FailureReason { get; set; } // bắt buộc có ý nghĩa khi Success = false
+    // Kho đích nhận hàng khi giao thành công. Đơn kênh NPP bỏ trống — API tự dùng
+    // đúng kho của NPP đó; đơn kênh Retail bắt buộc chọn (không có NPP mặc định).
+    public int? DestinationWarehouseId { get; set; }
 }
