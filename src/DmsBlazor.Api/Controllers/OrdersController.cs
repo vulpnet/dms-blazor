@@ -74,19 +74,35 @@ public class OrdersController(DmsDbContext db) : ControllerBase
         // nhất — kênh NPP đặt theo thùng (Product.CaseSize đơn vị/thùng), kênh Retail
         // đặt trực tiếp theo đơn vị lẻ. Không chặn nếu tồn không đủ (âm kho vẫn cho
         // đặt) — chỉ ghi nhận đúng số liệu để cảnh báo qua màn hình tồn kho.
+        //
+        // Bọc rõ ràng trong 1 transaction — nếu để mặc định (mỗi ApplyAsync tự
+        // commit UPDATE tồn kho ngay, tách rời SaveChangesAsync bên dưới), một lỗi
+        // giữa chừng (mất kết nối, exception ở dòng sau) sẽ để lại tồn kho đã bị trừ
+        // nhưng KHÔNG có đơn hàng nào được lưu — lệch số liệu âm thầm không cách nào
+        // phát hiện qua log ứng dụng.
         var centralWarehouseId = await db.Warehouses
             .Where(w => w.Type == WarehouseType.Central)
             .Select(w => w.Id)
             .FirstAsync();
 
-        foreach (var line in priced.Lines)
+        await using var transaction = await db.Database.BeginTransactionAsync();
+        try
         {
-            var unitQty = request.Channel == SalesChannel.Npp ? line.Qty * line.Product.CaseSize : line.Qty;
-            await InventoryService.ApplyAsync(db, centralWarehouseId, line.Product.Id, -unitQty,
-                InventoryTransactionType.OrderReserved, refCode: order.OrderCode);
-        }
+            foreach (var line in priced.Lines)
+            {
+                var unitQty = request.Channel == SalesChannel.Npp ? line.Qty * line.Product.CaseSize : line.Qty;
+                await InventoryService.ApplyAsync(db, centralWarehouseId, line.Product.Id, -unitQty,
+                    InventoryTransactionType.OrderReserved, refCode: order.OrderCode);
+            }
 
-        await db.SaveChangesAsync();
+            await db.SaveChangesAsync();
+            await transaction.CommitAsync();
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
 
         return CreatedAtAction(nameof(GetByCode), new { code = order.OrderCode }, order);
     }

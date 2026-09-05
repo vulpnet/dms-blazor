@@ -34,10 +34,11 @@ public class InventoryController(DmsDbContext db) : ControllerBase
     {
         if (request.Quantity <= 0) return BadRequest("Số lượng nhập phải lớn hơn 0.");
 
+        // ApplyAsync tự mở transaction + SaveChangesAsync + commit riêng khi gọi
+        // độc lập thế này (không có transaction bao ngoài) — không cần gọi thêm.
         await InventoryService.ApplyAsync(db, request.WarehouseId, request.ProductId,
             request.Quantity, InventoryTransactionType.StockIn, request.Note);
 
-        await db.SaveChangesAsync();
         return NoContent();
     }
 
@@ -60,7 +61,6 @@ public class InventoryController(DmsDbContext db) : ControllerBase
         await InventoryService.ApplyAsync(db, request.WarehouseId, request.ProductId,
             diff, InventoryTransactionType.Adjustment, request.Note.Trim());
 
-        await db.SaveChangesAsync();
         return NoContent();
     }
 }

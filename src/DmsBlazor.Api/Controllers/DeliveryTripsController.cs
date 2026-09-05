@@ -138,38 +138,53 @@ public class DeliveryTripsController(DmsDbContext db) : ControllerBase
         }
 
         var now = DateTimeOffset.UtcNow;
-        if (request.Success)
-        {
-            order.DeliveryStatus = OrderDeliveryStatus.Delivered;
-            order.DeliveredAt = now;
-            order.DeliveryFailureReason = null;
 
-            // Chuyển tồn kho: Kho xuất của chuyến đã bị trừ ngay lúc đặt đơn (xem
-            // OrdersController.Confirm) — ở đây chỉ CỘNG vào kho đích, không trừ lại
-            // kho nguồn (tránh trừ 2 lần cùng 1 số lượng).
-            foreach (var line in order.Lines)
+        // Bọc rõ ràng trong 1 transaction — cùng lý do như OrdersController.Confirm:
+        // ApplyAsync tự commit UPDATE tồn kho ngay nếu không có transaction bao
+        // ngoài, tách rời khỏi SaveChangesAsync cho Order/DeliveryTrip bên dưới.
+        await using var transaction = await db.Database.BeginTransactionAsync();
+        try
+        {
+            if (request.Success)
             {
-                var product = await db.Products.FirstOrDefaultAsync(p => p.Code == line.ProductCode);
-                if (product is null) continue; // sản phẩm đã bị xoá sau khi đặt đơn — bỏ qua, không chặn giao hàng
+                order.DeliveryStatus = OrderDeliveryStatus.Delivered;
+                order.DeliveredAt = now;
+                order.DeliveryFailureReason = null;
 
-                var unitQty = order.Channel == SalesChannel.Npp ? line.Qty * product.CaseSize : line.Qty;
-                await InventoryService.ApplyAsync(db, destinationWarehouseId!.Value, product.Id, unitQty,
-                    InventoryTransactionType.TripDelivered, refCode: order.OrderCode);
+                // Chuyển tồn kho: Kho xuất của chuyến đã bị trừ ngay lúc đặt đơn (xem
+                // OrdersController.Confirm) — ở đây chỉ CỘNG vào kho đích, không trừ
+                // lại kho nguồn (tránh trừ 2 lần cùng 1 số lượng).
+                foreach (var line in order.Lines)
+                {
+                    var product = await db.Products.FirstOrDefaultAsync(p => p.Code == line.ProductCode);
+                    if (product is null) continue; // sản phẩm đã bị xoá sau khi đặt đơn — bỏ qua, không chặn giao hàng
+
+                    var unitQty = order.Channel == SalesChannel.Npp ? line.Qty * product.CaseSize : line.Qty;
+                    await InventoryService.ApplyAsync(db, destinationWarehouseId!.Value, product.Id, unitQty,
+                        InventoryTransactionType.TripDelivered, refCode: order.OrderCode);
+                }
             }
+            else
+            {
+                order.DeliveryStatus = OrderDeliveryStatus.Failed;
+                order.DeliveryFailureReason = request.FailureReason!.Trim();
+            }
+
+            if (trip.Orders.All(o => o.DeliveryStatus is OrderDeliveryStatus.Delivered or OrderDeliveryStatus.Failed))
+            {
+                trip.Status = TripStatus.Completed;
+                trip.CompletedAt = now;
+            }
+
+            await db.SaveChangesAsync();
+            await transaction.CommitAsync();
         }
-        else
+        catch
         {
-            order.DeliveryStatus = OrderDeliveryStatus.Failed;
-            order.DeliveryFailureReason = request.FailureReason!.Trim();
+            await transaction.RollbackAsync();
+            throw;
         }
 
-        if (trip.Orders.All(o => o.DeliveryStatus is OrderDeliveryStatus.Delivered or OrderDeliveryStatus.Failed))
-        {
-            trip.Status = TripStatus.Completed;
-            trip.CompletedAt = now;
-        }
-
-        await db.SaveChangesAsync();
         return NoContent();
     }
 
