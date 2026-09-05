@@ -12,4 +12,5 @@ public class Product
     public decimal PricePerUnit { get; set; }     // giá 1 đơn vị lẻ (kênh bán lẻ) — nghìn đồng
     public string Emoji { get; set; } = "";
     public bool IsActive { get; set; } = true;    // đang bán — chỉ sản phẩm này mới hiện ở màn hình đặt hàng
+    public int LowStockThreshold { get; set; }    // ngưỡng cảnh báo tồn thấp (đơn vị lẻ), 0 = không cảnh báo
 }

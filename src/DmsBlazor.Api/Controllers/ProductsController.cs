@@ -51,6 +51,7 @@ public class ProductsController(DmsDbContext db) : ControllerBase
         product.PricePerUnit = input.PricePerUnit;
         product.Emoji = input.Emoji;
         product.IsActive = input.IsActive;
+        product.LowStockThreshold = input.LowStockThreshold;
 
         await db.SaveChangesAsync();
         return NoContent();

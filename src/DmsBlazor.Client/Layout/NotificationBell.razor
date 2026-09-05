@@ -1,0 +1,103 @@
+@using DmsBlazor.Shared.Models
+@using DmsBlazor.Client.Services
+@implements IAsyncDisposable
+@inject DmsApiClient Api
+
+<div class="notif-wrap">
+    <button class="notif-bell" @onclick="ToggleOpen" title="Thông báo">
+        🔔
+        @if (items is { Count: > 0 })
+        {
+            <span class="notif-badge">@items.Count</span>
+        }
+    </button>
+
+    @if (open)
+    {
+        <div class="notif-dropdown">
+            @if (items is null)
+            {
+                <p class="notif-empty">Đang tải...</p>
+            }
+            else if (items.Count == 0)
+            {
+                <p class="notif-empty">Không có việc gì cần chú ý.</p>
+            }
+            else
+            {
+                @foreach (var item in items)
+                {
+                    <a href="@(item.LinkHref ?? "#")" class="notif-item @SeverityClass(item.Severity)" @onclick="() => open = false">
+                        @item.Message
+                    </a>
+                }
+            }
+        </div>
+    }
+</div>
+
+<style>
+    .notif-wrap { position: relative; }
+    .notif-bell {
+        position: relative; background: none; border: none; cursor: pointer;
+        font-size: 1.1rem; padding: 0.3rem 0.5rem;
+    }
+    .notif-badge {
+        position: absolute; top: 0; right: 0; background: var(--danger); color: #fff;
+        font-size: 0.65rem; font-weight: 700; border-radius: 999px; padding: 0.05rem 0.35rem; line-height: 1.3;
+    }
+    .notif-dropdown {
+        position: absolute; top: 100%; right: 0; margin-top: 0.4rem; width: 320px;
+        background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+        box-shadow: var(--shadow-md); z-index: 60; overflow: hidden;
+    }
+    .notif-empty { padding: 1rem; font-size: 0.85rem; color: var(--muted); margin: 0; }
+    .notif-item {
+        display: block; padding: 0.7rem 1rem; font-size: 0.85rem; color: var(--ink);
+        text-decoration: none; border-bottom: 1px solid var(--line); border-left: 3px solid transparent;
+    }
+    .notif-item:last-child { border-bottom: none; }
+    .notif-item:hover { background: var(--canvas, #f4f6f9); }
+    .notif-item.severity-warning { border-left-color: var(--warning); }
+    .notif-item.severity-critical { border-left-color: var(--danger); }
+    .notif-item.severity-info { border-left-color: var(--brand); }
+</style>
+
+@code {
+    private List<NotificationItem>? items;
+    private bool open;
+    private System.Threading.Timer? pollTimer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadNotifications();
+        // Polling mỗi 30s — đủ nhanh để cảm giác "thông báo" mà không tốn tài
+        // nguyên/băng thông trên free tier như SignalR/WebSocket luôn mở.
+        pollTimer = new System.Threading.Timer(async _ => await InvokeAsync(async () =>
+        {
+            await LoadNotifications();
+            StateHasChanged();
+        }), null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
+    }
+
+    private async Task LoadNotifications()
+    {
+        try { items = await Api.GetNotificationsAsync(); }
+        catch { /* im lặng bỏ qua lỗi polling — không làm phiền người dùng vì 1 lần gọi lỗi */ }
+    }
+
+    private void ToggleOpen() => open = !open;
+
+    private static string SeverityClass(NotificationSeverity s) => s switch
+    {
+        NotificationSeverity.Warning => "severity-warning",
+        NotificationSeverity.Critical => "severity-critical",
+        _ => "severity-info"
+    };
+
+    public ValueTask DisposeAsync()
+    {
+        pollTimer?.Dispose();
+        return ValueTask.CompletedTask;
+    }
+}

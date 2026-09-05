@@ -95,6 +95,16 @@ else
                     <label for="f-region">Khu vực</label>
                     <InputText id="f-region" @bind-Value="formModel.Region" placeholder="vd: Miền Bắc" />
                 </div>
+                <div class="field-row">
+                    <div class="field">
+                        <label for="f-creditlimit">Hạn mức công nợ (nghìn đ, 0 = không giới hạn)</label>
+                        <InputNumber id="f-creditlimit" @bind-Value="formModel.CreditLimit" />
+                    </div>
+                    <div class="field">
+                        <label for="f-extradiscount">Chiết khấu riêng (%)</label>
+                        <InputNumber id="f-extradiscount" @bind-Value="formModel.ExtraDiscountPercent" />
+                    </div>
+                </div>
 
                 <div class="field field-checkbox">
                     <label>
@@ -168,6 +178,7 @@ else
     }
     .modal-panel-sm { max-width: 380px; }
     .modal-panel h3 { font-size: 1.05rem; margin-bottom: 1rem; }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem; }
     .field { margin-bottom: 1rem; }
     .field label { display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 0.35rem; }
     .field input {
@@ -240,7 +251,14 @@ else
     private void OpenEditForm(Distributor d)
     {
         editingId = d.Id;
-        formModel = new DistributorFormModel { Name = d.Name, Region = d.Region, IsActive = d.IsActive };
+        formModel = new DistributorFormModel
+        {
+            Name = d.Name,
+            Region = d.Region,
+            IsActive = d.IsActive,
+            CreditLimit = d.CreditLimit,
+            ExtraDiscountPercent = d.ExtraDiscountPercent
+        };
         formError = null;
         showForm = true;
     }
@@ -256,7 +274,9 @@ else
         {
             Name = formModel.Name.Trim(),
             Region = formModel.Region.Trim(),
-            IsActive = formModel.IsActive
+            IsActive = formModel.IsActive,
+            CreditLimit = formModel.CreditLimit,
+            ExtraDiscountPercent = formModel.ExtraDiscountPercent
         };
 
         var (success, error) = editingId is null
@@ -278,7 +298,14 @@ else
     private async Task ToggleActive(Distributor d, bool isActive)
     {
         d.IsActive = isActive;
-        var updated = new Distributor { Name = d.Name, Region = d.Region, IsActive = isActive };
+        var updated = new Distributor
+        {
+            Name = d.Name,
+            Region = d.Region,
+            IsActive = isActive,
+            CreditLimit = d.CreditLimit,
+            ExtraDiscountPercent = d.ExtraDiscountPercent
+        };
         var (success, _) = await Api.UpdateDistributorAsync(d.Id, updated);
         if (!success) await LoadDistributors();
     }
@@ -302,5 +329,11 @@ else
         public string Region { get; set; } = "";
 
         public bool IsActive { get; set; } = true;
+
+        [Range(0, 1000000000, ErrorMessage = "Hạn mức không hợp lệ")]
+        public decimal CreditLimit { get; set; }
+
+        [Range(0, 100, ErrorMessage = "Chiết khấu phải từ 0 đến 100")]
+        public decimal ExtraDiscountPercent { get; set; }
     }
 }

@@ -18,7 +18,7 @@ public static class OrderPricingService
     private const int ComboMinPerProduct = 20;
     private const int ComboFreeUnits = 1;
 
-    public static PricedOrder Price(IEnumerable<OrderLineInput> cart, IReadOnlyList<Product> catalog, SalesChannel channel)
+    public static PricedOrder Price(IEnumerable<OrderLineInput> cart, IReadOnlyList<Product> catalog, SalesChannel channel, decimal extraDiscountPercent = 0)
     {
         var lines = cart
             .Where(c => c.Qty > 0)
@@ -61,7 +61,10 @@ public static class OrderPricingService
                 l.FreeUnits = ComboFreeUnits;
         }
 
-        var discountAmount = Math.Round(subtotal * (discountPercent / 100), MidpointRounding.AwayFromZero);
+        // Chiết khấu riêng theo NPP (hợp đồng) cộng thẳng vào chiết khấu bậc thang —
+        // đơn giản, dễ hiểu trên hoá đơn (1 dòng %) thay vì 2 dòng chiết khấu riêng.
+        var totalDiscountPercent = discountPercent + extraDiscountPercent;
+        var discountAmount = Math.Round(subtotal * (totalDiscountPercent / 100), MidpointRounding.AwayFromZero);
         var total = subtotal - discountAmount;
 
         return new PricedOrder
@@ -69,7 +72,7 @@ public static class OrderPricingService
             Lines = lines,
             TotalQty = totalQty,
             Subtotal = subtotal,
-            DiscountPercent = discountPercent,
+            DiscountPercent = totalDiscountPercent,
             DiscountAmount = discountAmount,
             Total = total,
             AppliedTier = appliedTier,

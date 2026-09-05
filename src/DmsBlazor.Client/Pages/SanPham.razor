@@ -138,6 +138,11 @@ else
                     </div>
                 </div>
 
+                <div class="field">
+                    <label for="f-lowstock">Ngưỡng cảnh báo tồn thấp (đơn vị lẻ, 0 = không cảnh báo)</label>
+                    <InputNumber id="f-lowstock" @bind-Value="formModel.LowStockThreshold" />
+                </div>
+
                 <div class="field field-checkbox">
                     <label>
                         <InputCheckbox @bind-Value="formModel.IsActive" />
@@ -306,7 +311,8 @@ else
             PricePerCase = p.PricePerCase,
             PricePerUnit = p.PricePerUnit,
             Emoji = p.Emoji,
-            IsActive = p.IsActive
+            IsActive = p.IsActive,
+            LowStockThreshold = p.LowStockThreshold
         };
         formError = null;
         showForm = true;
@@ -329,7 +335,8 @@ else
             PricePerCase = formModel.PricePerCase,
             PricePerUnit = formModel.PricePerUnit,
             Emoji = string.IsNullOrWhiteSpace(formModel.Emoji) ? "📦" : formModel.Emoji.Trim(),
-            IsActive = formModel.IsActive
+            IsActive = formModel.IsActive,
+            LowStockThreshold = formModel.LowStockThreshold
         };
 
         var (success, error) = editingId is null
@@ -363,7 +370,8 @@ else
             PricePerCase = p.PricePerCase,
             PricePerUnit = p.PricePerUnit,
             Emoji = p.Emoji,
-            IsActive = isActive
+            IsActive = isActive,
+            LowStockThreshold = p.LowStockThreshold
         };
         var (success, _) = await Api.UpdateProductAsync(p.Id, updated);
         if (!success) await LoadProducts();
@@ -407,5 +415,8 @@ else
         public string Emoji { get; set; } = "📦";
 
         public bool IsActive { get; set; } = true;
+
+        [Range(0, 1000000, ErrorMessage = "Ngưỡng cảnh báo không hợp lệ")]
+        public int LowStockThreshold { get; set; }
     }
 }

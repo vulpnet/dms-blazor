@@ -75,3 +75,35 @@ public class AdjustStockRequest
     public int ActualQuantity { get; set; }
     public string Note { get; set; } = "";
 }
+
+/// <summary>1 dòng cảnh báo tồn kho đang thấp hơn ngưỡng đã đặt (Product.LowStockThreshold).</summary>
+public class LowStockAlert
+{
+    public int WarehouseId { get; set; }
+    public string WarehouseName { get; set; } = "";
+    public int ProductId { get; set; }
+    public string ProductCode { get; set; } = "";
+    public string ProductName { get; set; } = "";
+    public string Emoji { get; set; } = "";
+    public string Unit { get; set; } = "";
+    public int Quantity { get; set; }
+    public int Threshold { get; set; }
+}
+
+/// <summary>Gợi ý đặt hàng lại — tính từ tốc độ bán trung bình/ngày trong N ngày gần
+/// nhất (dựa trên InventoryTransaction loại xuất kho) so với tồn hiện tại, ước lượng
+/// còn bao nhiêu ngày là hết hàng. Chỉ mang tính tham khảo, KHÔNG tự tạo đơn.</summary>
+public class ReorderSuggestion
+{
+    public int WarehouseId { get; set; }
+    public string WarehouseName { get; set; } = "";
+    public int ProductId { get; set; }
+    public string ProductCode { get; set; } = "";
+    public string ProductName { get; set; } = "";
+    public string Emoji { get; set; } = "";
+    public string Unit { get; set; } = "";
+    public int Quantity { get; set; }
+    public decimal AvgDailyUsage { get; set; }
+    public int? DaysUntilStockout { get; set; } // null nếu AvgDailyUsage = 0 (không tiêu thụ)
+    public int SuggestedReorderQty { get; set; } // đủ dùng cho 14 ngày tới, trừ tồn hiện có
+}

@@ -16,8 +16,19 @@ public class OrdersController(DmsDbContext db) : ControllerBase
     public async Task<ActionResult<PricedOrder>> Price([FromBody] CreateOrderRequest request)
     {
         var products = await db.Products.Where(p => p.IsActive).ToListAsync();
-        var priced = OrderPricingService.Price(request.Lines, products, request.Channel);
+        var extraDiscount = await GetExtraDiscountAsync(request);
+        var priced = OrderPricingService.Price(request.Lines, products, request.Channel, extraDiscount);
         return priced;
+    }
+
+    // Chiết khấu riêng theo hợp đồng NPP — chỉ áp dụng kênh Npp và khi có DistributorId.
+    private async Task<decimal> GetExtraDiscountAsync(CreateOrderRequest request)
+    {
+        if (request.Channel != SalesChannel.Npp || !request.DistributorId.HasValue) return 0;
+        return await db.Distributors
+            .Where(d => d.Id == request.DistributorId.Value)
+            .Select(d => d.ExtraDiscountPercent)
+            .FirstOrDefaultAsync();
     }
 
     // Xác nhận đặt hàng — lưu thật vào database, sinh mã đơn tăng dần (DH-2026-0001).
@@ -25,7 +36,8 @@ public class OrdersController(DmsDbContext db) : ControllerBase
     public async Task<ActionResult<Order>> Confirm([FromBody] CreateOrderRequest request)
     {
         var products = await db.Products.Where(p => p.IsActive).ToListAsync();
-        var priced = OrderPricingService.Price(request.Lines, products, request.Channel);
+        var extraDiscount = await GetExtraDiscountAsync(request);
+        var priced = OrderPricingService.Price(request.Lines, products, request.Channel, extraDiscount);
 
         if (priced.Lines.Count == 0)
             return BadRequest("Đơn hàng không có sản phẩm nào.");

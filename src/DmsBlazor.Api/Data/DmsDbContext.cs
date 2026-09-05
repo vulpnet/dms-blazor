@@ -20,6 +20,7 @@ public class DmsDbContext(DbContextOptions<DmsDbContext> options) : DbContext(op
     public DbSet<Warehouse> Warehouses => Set<Warehouse>();
     public DbSet<InventoryStock> InventoryStocks => Set<InventoryStock>();
     public DbSet<InventoryTransaction> InventoryTransactions => Set<InventoryTransaction>();
+    public DbSet<DistributorPayment> DistributorPayments => Set<DistributorPayment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -29,6 +30,14 @@ public class DmsDbContext(DbContextOptions<DmsDbContext> options) : DbContext(op
             e.Property(x => x.Name).HasMaxLength(200).IsRequired();
             e.Property(x => x.Region).HasMaxLength(100).IsRequired();
             e.Property(x => x.IsActive).HasDefaultValue(true);
+            e.Property(x => x.CreditLimit).HasPrecision(14, 2);
+        });
+
+        modelBuilder.Entity<DistributorPayment>(e =>
+        {
+            e.ToTable("distributor_payments");
+            e.Property(x => x.Amount).HasPrecision(14, 2);
+            e.Property(x => x.Note).HasMaxLength(500);
         });
 
         modelBuilder.Entity<Customer>(e =>

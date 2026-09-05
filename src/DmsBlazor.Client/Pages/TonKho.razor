@@ -22,49 +22,127 @@
 }
 else
 {
-    <div class="field">
-        <label for="warehouse-select">Xem tồn kho tại</label>
-        <select id="warehouse-select" @bind="selectedWarehouseId" @bind:after="LoadStocks">
-            @foreach (var w in warehouses)
-            {
-                <option value="@w.Id">@w.Name</option>
-            }
-        </select>
+    <div class="tabs" role="tablist">
+        <button role="tab" aria-selected="@(activeTab == "stocks")" class="@(activeTab == "stocks" ? "tab active" : "tab")" @onclick='() => SetTab("stocks")'>Tồn kho</button>
+        <button role="tab" aria-selected="@(activeTab == "low-stock")" class="@(activeTab == "low-stock" ? "tab active" : "tab")" @onclick='() => SetTab("low-stock")'>⚠️ Tồn thấp</button>
+        <button role="tab" aria-selected="@(activeTab == "reorder")" class="@(activeTab == "reorder" ? "tab active" : "tab")" @onclick='() => SetTab("reorder")'>📈 Gợi ý đặt lại</button>
     </div>
 
-    <div class="filter-bar">
-        <input class="filter-search" @bind="searchText" @bind:event="oninput" placeholder="Tìm theo mã, tên sản phẩm..." />
-    </div>
-
-    @if (stocks is null)
+    @if (activeTab == "stocks")
     {
-        <div class="skeleton-row"><div class="skeleton-card"></div></div>
+        <div class="field">
+            <label for="warehouse-select">Xem tồn kho tại</label>
+            <select id="warehouse-select" @bind="selectedWarehouseId" @bind:after="LoadStocks">
+                @foreach (var w in warehouses)
+                {
+                    <option value="@w.Id">@w.Name</option>
+                }
+            </select>
+        </div>
+
+        <div class="filter-bar">
+            <input class="filter-search" @bind="searchText" @bind:event="oninput" placeholder="Tìm theo mã, tên sản phẩm..." />
+        </div>
+
+        @if (stocks is null)
+        {
+            <div class="skeleton-row"><div class="skeleton-card"></div></div>
+        }
+        else if (FilteredStocks.Count == 0)
+        {
+            <p class="muted">Chưa có tồn kho nào tại kho này.</p>
+        }
+        else
+        {
+            <div class="card">
+                <table class="data-table">
+                    <thead>
+                        <tr><th></th><th>Mã</th><th>Tên sản phẩm</th><th class="text-right">Tồn kho</th><th>Đơn vị</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var s in FilteredStocks)
+                        {
+                            <tr class="@(s.Quantity < 0 ? "row-negative" : "")">
+                                <td>@s.Emoji</td>
+                                <td><code>@s.ProductCode</code></td>
+                                <td>@s.ProductName</td>
+                                <td class="text-right">@s.Quantity.ToString("N0")</td>
+                                <td>@s.Unit</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
     }
-    else if (FilteredStocks.Count == 0)
+    else if (activeTab == "low-stock")
     {
-        <p class="muted">Chưa có tồn kho nào tại kho này.</p>
+        @if (lowStockAlerts is null)
+        {
+            <div class="skeleton-row"><div class="skeleton-card"></div></div>
+        }
+        else if (lowStockAlerts.Count == 0)
+        {
+            <p class="muted">Không có sản phẩm nào đang tồn thấp hơn ngưỡng cảnh báo. Đặt ngưỡng ở màn hình Sản phẩm.</p>
+        }
+        else
+        {
+            <div class="card">
+                <table class="data-table">
+                    <thead>
+                        <tr><th></th><th>Sản phẩm</th><th>Kho</th><th class="text-right">Tồn hiện tại</th><th class="text-right">Ngưỡng cảnh báo</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var a in lowStockAlerts)
+                        {
+                            <tr class="row-negative">
+                                <td>@a.Emoji</td>
+                                <td>@a.ProductName</td>
+                                <td>@a.WarehouseName</td>
+                                <td class="text-right">@a.Quantity.ToString("N0") @a.Unit</td>
+                                <td class="text-right">@a.Threshold.ToString("N0")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
     }
     else
     {
-        <div class="card">
-            <table class="data-table">
-                <thead>
-                    <tr><th></th><th>Mã</th><th>Tên sản phẩm</th><th class="text-right">Tồn kho</th><th>Đơn vị</th></tr>
-                </thead>
-                <tbody>
-                    @foreach (var s in FilteredStocks)
-                    {
-                        <tr class="@(s.Quantity < 0 ? "row-negative" : "")">
-                            <td>@s.Emoji</td>
-                            <td><code>@s.ProductCode</code></td>
-                            <td>@s.ProductName</td>
-                            <td class="text-right">@s.Quantity.ToString("N0")</td>
-                            <td>@s.Unit</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
+        <p class="muted">Ước lượng dựa trên tốc độ bán trung bình 30 ngày gần nhất — chỉ mang tính tham khảo, không tự tạo đơn.</p>
+        @if (reorderSuggestions is null)
+        {
+            <div class="skeleton-row"><div class="skeleton-card"></div></div>
+        }
+        else if (reorderSuggestions.Count == 0)
+        {
+            <p class="muted">Chưa có sản phẩm nào cần đặt lại trong thời gian tới.</p>
+        }
+        else
+        {
+            <div class="card">
+                <table class="data-table">
+                    <thead>
+                        <tr><th></th><th>Sản phẩm</th><th>Kho</th><th class="text-right">Tồn hiện tại</th><th class="text-right">Bán TB/ngày</th><th class="text-right">Còn (ngày)</th><th class="text-right">Đề xuất đặt thêm</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in reorderSuggestions)
+                        {
+                            <tr>
+                                <td>@r.Emoji</td>
+                                <td>@r.ProductName</td>
+                                <td>@r.WarehouseName</td>
+                                <td class="text-right">@r.Quantity.ToString("N0") @r.Unit</td>
+                                <td class="text-right">@r.AvgDailyUsage.ToString("N1")</td>
+                                <td class="text-right">@(r.DaysUntilStockout?.ToString("N0") ?? "—")</td>
+                                <td class="text-right reorder-qty">+@r.SuggestedReorderQty.ToString("N0")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
     }
 }
 
@@ -185,6 +263,15 @@ else
     .text-right { text-align: right; }
     .row-negative { background: var(--danger-soft); }
     .muted { color: var(--muted); font-size: 0.85rem; }
+    .reorder-qty { font-weight: 650; color: var(--brand); }
+
+    .tabs { display: flex; gap: 0.4rem; border-bottom: 1px solid var(--line); margin-bottom: 1.25rem; }
+    .tab {
+        background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer;
+        padding: 0.6rem 0.9rem; font-size: 0.88rem; font-weight: 600; color: var(--muted);
+    }
+    .tab.active { color: var(--brand); border-bottom-color: var(--brand); }
+    .tab:hover:not(.active) { color: var(--ink); }
 
     .modal-backdrop {
         position: fixed; inset: 0; background: rgba(15,23,42,0.45);
@@ -202,8 +289,11 @@ else
     private List<Warehouse>? warehouses;
     private List<Product>? products;
     private List<InventoryStock>? stocks;
+    private List<LowStockAlert>? lowStockAlerts;
+    private List<ReorderSuggestion>? reorderSuggestions;
     private int selectedWarehouseId;
     private string searchText = "";
+    private string activeTab = "stocks";
 
     private bool showStockInForm;
     private bool showAdjustForm;
@@ -233,6 +323,13 @@ else
         stocks = null;
         if (selectedWarehouseId == 0) return;
         stocks = await Api.GetStocksAsync(selectedWarehouseId);
+    }
+
+    private async Task SetTab(string tab)
+    {
+        activeTab = tab;
+        if (tab == "low-stock" && lowStockAlerts is null) lowStockAlerts = await Api.GetLowStockAsync();
+        if (tab == "reorder" && reorderSuggestions is null) reorderSuggestions = await Api.GetReorderSuggestionsAsync();
     }
 
     private void OpenStockInForm()

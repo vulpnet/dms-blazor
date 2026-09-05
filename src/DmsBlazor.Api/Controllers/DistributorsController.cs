@@ -42,6 +42,8 @@ public class DistributorsController(DmsDbContext db) : ControllerBase
         distributor.Name = input.Name;
         distributor.Region = input.Region;
         distributor.IsActive = input.IsActive;
+        distributor.CreditLimit = input.CreditLimit;
+        distributor.ExtraDiscountPercent = input.ExtraDiscountPercent;
 
         await db.SaveChangesAsync();
         return NoContent();

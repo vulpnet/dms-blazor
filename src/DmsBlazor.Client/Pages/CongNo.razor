@@ -1,0 +1,248 @@
+@page "/cong-no"
+@using DmsBlazor.Shared.Models
+@using DmsBlazor.Client.Services
+@inject DmsApiClient Api
+
+<PageTitle>Công nợ nhà phân phối — DMS</PageTitle>
+
+<div class="page-header">
+    <h1>Công nợ nhà phân phối</h1>
+    <p>Mọi đơn hàng kênh NPP đều tự động ghi nợ — dùng "Ghi nhận thanh toán" khi NPP trả tiền để trừ công nợ.</p>
+</div>
+
+@if (debts is null)
+{
+    <div class="skeleton-row"><div class="skeleton-card"></div></div>
+}
+else
+{
+    <div class="filter-bar">
+        <input class="filter-search" @bind="searchText" @bind:event="oninput" placeholder="Tìm theo tên nhà phân phối..." />
+        <label class="filter-checkbox">
+            <input type="checkbox" @bind="onlyOverLimit" />
+            Chỉ hiện NPP vượt hạn mức
+        </label>
+    </div>
+
+    @if (FilteredDebts.Count == 0)
+    {
+        <p class="muted">Không có nhà phân phối nào khớp bộ lọc.</p>
+    }
+    else
+    {
+        <div class="card">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Nhà phân phối</th>
+                        <th class="text-right">Hạn mức</th>
+                        <th class="text-right">Tổng đã đặt</th>
+                        <th class="text-right">Đã thanh toán</th>
+                        <th class="text-right">Công nợ hiện tại</th>
+                        <th></th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var d in FilteredDebts)
+                    {
+                        <tr class="@(d.OverLimit ? "row-over-limit" : "")">
+                            <td>@d.DistributorName</td>
+                            <td class="text-right">@(d.CreditLimit > 0 ? d.CreditLimit.ToString("N0") + "k" : "Không giới hạn")</td>
+                            <td class="text-right">@d.TotalOrdered.ToString("N0")k</td>
+                            <td class="text-right">@d.TotalPaid.ToString("N0")k</td>
+                            <td class="text-right debt-amount">@d.CurrentDebt.ToString("N0")k</td>
+                            <td>
+                                @if (d.OverLimit)
+                                {
+                                    <span class="channel-badge over-limit">Vượt hạn mức</span>
+                                }
+                            </td>
+                            <td class="row-actions">
+                                <button class="btn-link" @onclick="() => OpenPaymentForm(d)">Ghi nhận thanh toán</button>
+                                <button class="btn-link" @onclick="() => ToggleHistory(d.DistributorId)">Lịch sử</button>
+                            </td>
+                        </tr>
+                        @if (expandedDistributorId == d.DistributorId)
+                        {
+                            <tr class="history-row">
+                                <td colspan="7">
+                                    @if (payments is null)
+                                    {
+                                        <p class="muted">Đang tải...</p>
+                                    }
+                                    else if (payments.Count == 0)
+                                    {
+                                        <p class="muted">Chưa có lần thanh toán nào.</p>
+                                    }
+                                    else
+                                    {
+                                        <ul class="payment-list">
+                                            @foreach (var p in payments)
+                                            {
+                                                <li>
+                                                    <span>@p.CreatedAt.ToLocalTime().ToString("HH:mm dd/MM/yyyy")</span>
+                                                    <span class="payment-amount">+@p.Amount.ToString("N0")k</span>
+                                                    <span class="muted">@p.Note</span>
+                                                </li>
+                                            }
+                                        </ul>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+}
+
+@if (payingDistributor is not null)
+{
+    <div class="modal-backdrop" @onclick="() => payingDistributor = null">
+        <div class="modal-panel" @onclick:stopPropagation="true">
+            <h3>Ghi nhận thanh toán — @payingDistributor.DistributorName</h3>
+            <p class="muted">Công nợ hiện tại: <b>@payingDistributor.CurrentDebt.ToString("N0")k</b></p>
+            <div class="field">
+                <label for="pay-amount">Số tiền thanh toán (nghìn đồng)</label>
+                <input id="pay-amount" type="number" min="1" @bind="paymentAmount" />
+            </div>
+            <div class="field">
+                <label for="pay-note">Ghi chú (tuỳ chọn)</label>
+                <input id="pay-note" @bind="paymentNote" placeholder="vd: Chuyển khoản ngày 05/09" />
+            </div>
+
+            @if (paymentError is not null)
+            {
+                <div class="alert-error">@paymentError</div>
+            }
+
+            <div class="modal-actions">
+                <button class="btn-outline" @onclick="() => payingDistributor = null">Huỷ</button>
+                <button class="btn-primary" disabled="@saving" @onclick="SubmitPayment">
+                    @(saving ? "Đang lưu..." : "Xác nhận thanh toán")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .filter-bar { display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; margin-bottom: 1rem; }
+    .filter-search { flex: 1; min-width: 220px; padding: 0.55rem 0.8rem; border: 1px solid var(--line-strong); border-radius: 8px; font-size: 0.88rem; }
+    .filter-checkbox { display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; cursor: pointer; white-space: nowrap; }
+    .text-right { text-align: right; }
+    .row-actions { text-align: right; white-space: nowrap; display: flex; gap: 0.6rem; justify-content: flex-end; }
+    .btn-link { background: none; border: none; cursor: pointer; color: var(--brand); font-weight: 600; font-size: 0.83rem; padding: 0.2rem 0.4rem; }
+    .btn-link:hover { text-decoration: underline; }
+    .muted { color: var(--muted); font-size: 0.85rem; }
+    .debt-amount { font-weight: 650; }
+    .row-over-limit { background: var(--danger-soft); }
+    .channel-badge { font-size: 0.75rem; font-weight: 650; padding: 0.2rem 0.55rem; border-radius: 999px; }
+    .channel-badge.over-limit { background: var(--danger); color: #fff; }
+
+    .history-row td { background: var(--canvas, #f4f6f9); padding: 0.75rem 1rem; }
+    .payment-list { list-style: none; margin: 0; padding: 0; }
+    .payment-list li { display: flex; gap: 1rem; padding: 0.35rem 0; font-size: 0.85rem; }
+    .payment-amount { color: var(--success); font-weight: 650; }
+
+    .modal-backdrop {
+        position: fixed; inset: 0; background: rgba(15,23,42,0.45);
+        display: flex; align-items: center; justify-content: center; padding: 1rem; z-index: 50;
+    }
+    .modal-panel {
+        background: var(--surface); border-radius: var(--radius); padding: 1.5rem;
+        width: 100%; max-width: 420px; box-shadow: var(--shadow-md);
+    }
+    .modal-panel h3 { font-size: 1.05rem; margin-bottom: 0.5rem; }
+    .field { margin-bottom: 1rem; }
+    .field label { display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 0.4rem; }
+    .field input { width: 100%; padding: 0.55rem 0.7rem; border: 1px solid var(--line-strong); border-radius: 8px; font-size: 0.88rem; box-sizing: border-box; }
+    .btn-outline {
+        border: 1px solid var(--line-strong); color: var(--ink); background: var(--surface);
+        padding: 0.55rem 1rem; border-radius: 8px; font-weight: 600; font-size: 0.85rem; cursor: pointer;
+    }
+    .btn-primary {
+        background: var(--brand); color: #fff; border: none; border-radius: 8px;
+        padding: 0.6rem 1.2rem; font-weight: 600; cursor: pointer; font-size: 0.85rem;
+    }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 1.25rem; }
+</style>
+
+@code {
+    private List<DistributorDebt>? debts;
+    private string searchText = "";
+    private bool onlyOverLimit;
+
+    private int? expandedDistributorId;
+    private List<DistributorPayment>? payments;
+
+    private DistributorDebt? payingDistributor;
+    private decimal paymentAmount = 1;
+    private string paymentNote = "";
+    private string? paymentError;
+    private bool saving;
+
+    private List<DistributorDebt> FilteredDebts => (debts ?? [])
+        .Where(d => string.IsNullOrWhiteSpace(searchText) || d.DistributorName.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+        .Where(d => !onlyOverLimit || d.OverLimit)
+        .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        debts = await Api.GetDebtsAsync();
+    }
+
+    private async Task ToggleHistory(int distributorId)
+    {
+        if (expandedDistributorId == distributorId)
+        {
+            expandedDistributorId = null;
+            return;
+        }
+        expandedDistributorId = distributorId;
+        payments = null;
+        payments = await Api.GetPaymentsAsync(distributorId);
+    }
+
+    private void OpenPaymentForm(DistributorDebt d)
+    {
+        payingDistributor = d;
+        paymentAmount = 1;
+        paymentNote = "";
+        paymentError = null;
+    }
+
+    private async Task SubmitPayment()
+    {
+        if (payingDistributor is null) return;
+        paymentError = null;
+
+        if (paymentAmount <= 0)
+        {
+            paymentError = "Số tiền thanh toán phải lớn hơn 0.";
+            return;
+        }
+
+        saving = true;
+        var (success, error) = await Api.CreatePaymentAsync(new CreatePaymentRequest
+        {
+            DistributorId = payingDistributor.DistributorId,
+            Amount = paymentAmount,
+            Note = paymentNote
+        });
+        saving = false;
+
+        if (!success)
+        {
+            paymentError = error ?? "Không thể ghi nhận thanh toán.";
+            return;
+        }
+
+        payingDistributor = null;
+        debts = await Api.GetDebtsAsync();
+        if (expandedDistributorId.HasValue) payments = await Api.GetPaymentsAsync(expandedDistributorId.Value);
+    }
+}

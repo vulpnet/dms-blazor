@@ -276,4 +276,33 @@ public class DmsApiClient(HttpClient http)
         if (res.IsSuccessStatusCode) return (true, null);
         return (false, await res.Content.ReadAsStringAsync());
     }
+
+    public Task<List<LowStockAlert>?> GetLowStockAsync(int? warehouseId = null) =>
+        http.GetFromJsonAsync<List<LowStockAlert>>(warehouseId.HasValue ? $"api/inventory/low-stock?warehouseId={warehouseId}" : "api/inventory/low-stock");
+
+    public Task<List<ReorderSuggestion>?> GetReorderSuggestionsAsync(int? warehouseId = null, int days = 30)
+    {
+        var qs = warehouseId.HasValue ? $"?warehouseId={warehouseId}&days={days}" : $"?days={days}";
+        return http.GetFromJsonAsync<List<ReorderSuggestion>>($"api/inventory/reorder-suggestions{qs}");
+    }
+
+    // ===== Công nợ nhà phân phối =====
+
+    public Task<List<DistributorDebt>?> GetDebtsAsync() =>
+        http.GetFromJsonAsync<List<DistributorDebt>>("api/distributorpayments/debts");
+
+    public Task<List<DistributorPayment>?> GetPaymentsAsync(int distributorId) =>
+        http.GetFromJsonAsync<List<DistributorPayment>>($"api/distributorpayments/{distributorId}/payments");
+
+    public async Task<(bool Success, string? Error)> CreatePaymentAsync(CreatePaymentRequest request)
+    {
+        var res = await http.PostAsJsonAsync("api/distributorpayments", request);
+        if (res.IsSuccessStatusCode) return (true, null);
+        return (false, await res.Content.ReadAsStringAsync());
+    }
+
+    // ===== Thông báo =====
+
+    public Task<List<NotificationItem>?> GetNotificationsAsync() =>
+        http.GetFromJsonAsync<List<NotificationItem>>("api/notifications");
 }
