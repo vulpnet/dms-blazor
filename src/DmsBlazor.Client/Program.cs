@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using DmsBlazor.Client;
+using DmsBlazor.Client.Auth;
 using DmsBlazor.Client.Services;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
@@ -13,7 +14,17 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 var apiBaseUrl = builder.Configuration["ApiBaseUrl"]
     ?? throw new InvalidOperationException("Thiếu cấu hình ApiBaseUrl trong wwwroot/appsettings.json");
 
-builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(apiBaseUrl) });
+builder.Services.AddSingleton<AuthState>();
+builder.Services.AddTransient<JwtAuthorizationHandler>();
+
+builder.Services.AddScoped(sp =>
+{
+    var handler = sp.GetRequiredService<JwtAuthorizationHandler>();
+    handler.InnerHandler = new HttpClientHandler();
+    return new HttpClient(handler) { BaseAddress = new Uri(apiBaseUrl) };
+});
 builder.Services.AddScoped<DmsApiClient>();
 
-await builder.Build().RunAsync();
+var host = builder.Build();
+await host.Services.GetRequiredService<AuthState>().InitializeAsync();
+await host.RunAsync();

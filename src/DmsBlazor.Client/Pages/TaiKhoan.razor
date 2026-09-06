@@ -1,0 +1,306 @@
+@page "/tai-khoan"
+@using DmsBlazor.Shared.Models
+@using DmsBlazor.Client.Services
+@using DmsBlazor.Client.Auth
+@inject DmsApiClient Api
+@inject AuthState CurrentAuth
+
+<PageTitle>Quản lý tài khoản — DMS</PageTitle>
+
+@if (CurrentAuth.Role != UserRole.Admin)
+{
+    <p class="muted">Bạn không có quyền truy cập trang này.</p>
+}
+else
+{
+    <div class="page-header page-header-row">
+        <div>
+            <h1>Quản lý tài khoản</h1>
+            <p>Tạo và phân quyền tài khoản đăng nhập cho từng người dùng hệ thống.</p>
+        </div>
+        <button class="btn-primary" @onclick="OpenCreateForm">+ Thêm tài khoản</button>
+    </div>
+
+    @if (editing is not null)
+    {
+        <div class="card form-card">
+            <h3>@(isCreating ? "Thêm tài khoản mới" : $"Sửa tài khoản — {editing.Username}")</h3>
+            <div class="form-grid">
+                <div class="field">
+                    <label for="u-username">Tên đăng nhập</label>
+                    <input id="u-username" @bind="editing.Username" disabled="@(!isCreating)" />
+                </div>
+                <div class="field">
+                    <label for="u-displayname">Họ tên hiển thị</label>
+                    <input id="u-displayname" @bind="editing.DisplayName" />
+                </div>
+                <div class="field">
+                    <label for="u-password">@(isCreating ? "Mật khẩu" : "Đổi mật khẩu (để trống nếu giữ nguyên)")</label>
+                    <input id="u-password" type="password" @bind="editing.Password" />
+                </div>
+                <div class="field">
+                    <label for="u-role">Vai trò</label>
+                    <select id="u-role" @bind="editing.Role">
+                        <option value="@UserRole.Admin">Quản lý</option>
+                        <option value="@UserRole.SalesRep">Nhân viên bán hàng</option>
+                        <option value="@UserRole.Driver">Tài xế</option>
+                        <option value="@UserRole.Warehouse">Thủ kho</option>
+                        <option value="@UserRole.Accountant">Kế toán công nợ</option>
+                    </select>
+                </div>
+
+                @if (editing.Role == UserRole.SalesRep)
+                {
+                    <div class="field">
+                        <label for="u-rep">Gắn với nhân viên bán hàng</label>
+                        <select id="u-rep" @bind="editing.LinkedSalesRepId">
+                            <option value="">— Chưa gắn —</option>
+                            @foreach (var r in salesReps ?? [])
+                            {
+                                <option value="@r.Id">@r.Name</option>
+                            }
+                        </select>
+                    </div>
+                }
+
+                @if (editing.Role == UserRole.Driver)
+                {
+                    <div class="field">
+                        <label for="u-driver">Gắn với tài xế</label>
+                        <select id="u-driver" @bind="editing.LinkedDriverId">
+                            <option value="">— Chưa gắn —</option>
+                            @foreach (var d in drivers ?? [])
+                            {
+                                <option value="@d.Id">@d.Name</option>
+                            }
+                        </select>
+                    </div>
+                }
+
+                @if (!isCreating)
+                {
+                    <div class="field field-checkbox">
+                        <label><input type="checkbox" @bind="editing.IsActive" /> Tài khoản đang hoạt động</label>
+                    </div>
+                }
+            </div>
+
+            @if (formError is not null)
+            {
+                <div class="alert-error">@formError</div>
+            }
+
+            <div class="modal-actions">
+                <button class="btn-outline" @onclick="() => editing = null">Huỷ bỏ</button>
+                <button class="btn-primary" disabled="@saving" @onclick="Save">@(saving ? "Đang lưu..." : "Lưu")</button>
+            </div>
+        </div>
+    }
+
+    @if (users is null)
+    {
+        <div class="skeleton-row"><div class="skeleton-card"></div></div>
+    }
+    else if (users.Count == 0)
+    {
+        <p class="muted">Chưa có tài khoản nào.</p>
+    }
+    else
+    {
+        <div class="filter-bar">
+            <input class="filter-search" @bind="searchText" @bind:event="oninput" placeholder="Tìm theo tên đăng nhập, họ tên..." />
+        </div>
+
+        <div class="card">
+            <table class="data-table">
+                <thead>
+                    <tr><th>Tên đăng nhập</th><th>Họ tên</th><th>Vai trò</th><th>Trạng thái</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var u in FilteredUsers)
+                    {
+                        <tr>
+                            <td><code>@u.Username</code></td>
+                            <td>@u.DisplayName</td>
+                            <td>@RoleLabel(u.Role)</td>
+                            <td>
+                                <span class="channel-badge @(u.IsActive ? "active" : "inactive")">
+                                    @(u.IsActive ? "Hoạt động" : "Đã khoá")
+                                </span>
+                            </td>
+                            <td class="row-actions">
+                                <button class="btn-link" @onclick="() => OpenEditForm(u)">Sửa</button>
+                                <button class="btn-link danger" @onclick="() => Delete(u)">Xoá</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+}
+
+<style>
+    .page-header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
+    .filter-bar { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .filter-search { flex: 1; min-width: 220px; padding: 0.55rem 0.8rem; border: 1px solid var(--line-strong); border-radius: 8px; font-size: 0.88rem; }
+    .btn-primary {
+        background: var(--brand); color: #fff; border: none; border-radius: 8px;
+        padding: 0.6rem 1.2rem; font-weight: 600; cursor: pointer; font-size: 0.85rem;
+    }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-outline {
+        border: 1px solid var(--line-strong); color: var(--ink); background: var(--surface);
+        padding: 0.55rem 1rem; border-radius: 8px; font-weight: 600; font-size: 0.85rem; cursor: pointer;
+    }
+    .btn-link { border: none; background: transparent; color: var(--brand); font-weight: 600; font-size: 0.83rem; cursor: pointer; }
+    .btn-link.danger { color: var(--danger); }
+    .row-actions { text-align: right; white-space: nowrap; display: flex; gap: 0.6rem; justify-content: flex-end; }
+    .muted { color: var(--muted); font-size: 0.85rem; }
+
+    .form-card { margin-bottom: 1.5rem; }
+    .form-card h3 { margin-bottom: 1rem; }
+    .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+    @@media (max-width: 700px) {
+        .form-grid { grid-template-columns: 1fr; }
+    }
+    .field label { display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 0.4rem; }
+    .field input, .field select { width: 100%; padding: 0.55rem 0.7rem; border: 1px solid var(--line-strong); border-radius: 8px; font-size: 0.88rem; box-sizing: border-box; }
+    .field input:disabled { background: var(--canvas, #f4f6f9); color: var(--muted); }
+    .field-checkbox label { display: flex; align-items: center; gap: 0.5rem; font-weight: 500; }
+    .field-checkbox input { width: auto; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 1.25rem; }
+
+    .channel-badge { font-size: 0.75rem; font-weight: 650; padding: 0.2rem 0.55rem; border-radius: 999px; }
+    .channel-badge.active { background: var(--success-soft); color: var(--success); }
+    .channel-badge.inactive { background: #eef1f5; color: #475569; }
+</style>
+
+@code {
+    private List<User>? users;
+    private List<SalesRep>? salesReps;
+    private List<Driver>? drivers;
+
+    private class EditModel
+    {
+        public int Id;
+        public string Username = "";
+        public string DisplayName = "";
+        public string Password = "";
+        public UserRole Role = UserRole.SalesRep;
+        public bool IsActive = true;
+        public int? LinkedSalesRepId;
+        public int? LinkedDriverId;
+    }
+
+    private EditModel? editing;
+    private bool isCreating;
+    private bool saving;
+    private string? formError;
+    private string searchText = "";
+
+    private List<User> FilteredUsers => (users ?? [])
+        .Where(u => string.IsNullOrWhiteSpace(searchText)
+            || u.Username.Contains(searchText, StringComparison.OrdinalIgnoreCase)
+            || u.DisplayName.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+        .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (CurrentAuth.Role != UserRole.Admin) return;
+        await Reload();
+        salesReps = await Api.GetSalesRepsAsync();
+        drivers = await Api.GetDriversAsync();
+    }
+
+    private async Task Reload() => users = await Api.GetUsersAsync();
+
+    private void OpenCreateForm()
+    {
+        formError = null;
+        isCreating = true;
+        editing = new EditModel();
+    }
+
+    private void OpenEditForm(User u)
+    {
+        formError = null;
+        isCreating = false;
+        editing = new EditModel
+        {
+            Id = u.Id,
+            Username = u.Username,
+            DisplayName = u.DisplayName,
+            Role = u.Role,
+            IsActive = u.IsActive,
+            LinkedSalesRepId = u.LinkedSalesRepId,
+            LinkedDriverId = u.LinkedDriverId
+        };
+    }
+
+    private async Task Save()
+    {
+        if (editing is null) return;
+
+        if (string.IsNullOrWhiteSpace(editing.Username) || string.IsNullOrWhiteSpace(editing.DisplayName))
+        {
+            formError = "Vui lòng nhập đầy đủ tên đăng nhập và họ tên.";
+            return;
+        }
+        if (isCreating && string.IsNullOrWhiteSpace(editing.Password))
+        {
+            formError = "Vui lòng nhập mật khẩu cho tài khoản mới.";
+            return;
+        }
+
+        saving = true;
+        var linkedSalesRepId = editing.Role == UserRole.SalesRep ? editing.LinkedSalesRepId : null;
+        var linkedDriverId = editing.Role == UserRole.Driver ? editing.LinkedDriverId : null;
+
+        var (success, error) = isCreating
+            ? await Api.CreateUserAsync(new CreateUserRequest
+            {
+                Username = editing.Username,
+                Password = editing.Password,
+                DisplayName = editing.DisplayName,
+                Role = editing.Role,
+                LinkedSalesRepId = linkedSalesRepId,
+                LinkedDriverId = linkedDriverId
+            })
+            : await Api.UpdateUserAsync(editing.Id, new UpdateUserRequest
+            {
+                DisplayName = editing.DisplayName,
+                Role = editing.Role,
+                IsActive = editing.IsActive,
+                LinkedSalesRepId = linkedSalesRepId,
+                LinkedDriverId = linkedDriverId,
+                Password = string.IsNullOrWhiteSpace(editing.Password) ? null : editing.Password
+            });
+        saving = false;
+
+        if (!success)
+        {
+            formError = error ?? "Không thể lưu tài khoản.";
+            return;
+        }
+
+        editing = null;
+        await Reload();
+    }
+
+    private async Task Delete(User u)
+    {
+        await Api.DeleteUserAsync(u.Id);
+        await Reload();
+    }
+
+    private static string RoleLabel(UserRole role) => role switch
+    {
+        UserRole.Admin => "Quản lý",
+        UserRole.SalesRep => "Nhân viên bán hàng",
+        UserRole.Driver => "Tài xế",
+        UserRole.Warehouse => "Thủ kho",
+        UserRole.Accountant => "Kế toán công nợ",
+        _ => role.ToString()
+    };
+}

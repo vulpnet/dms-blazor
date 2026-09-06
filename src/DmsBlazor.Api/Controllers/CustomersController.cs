@@ -1,5 +1,6 @@
 using DmsBlazor.Api.Data;
 using DmsBlazor.Shared.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,6 +9,7 @@ namespace DmsBlazor.Api.Controllers;
 /// <summary>CRUD quản lý khách lẻ (kênh Retail) — khác CatalogController.GetCustomers (chỉ đọc, đã lọc IsActive).</summary>
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Roles = nameof(UserRole.Admin))]
 public class CustomersController(DmsDbContext db) : ControllerBase
 {
     [HttpGet]

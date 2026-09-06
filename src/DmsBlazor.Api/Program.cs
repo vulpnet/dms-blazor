@@ -1,5 +1,8 @@
+using System.Text;
 using DmsBlazor.Api.Data;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 
 // Tắt tự-theo-dõi-thay-đổi file cấu hình (reloadOnChange) — mặc định ASP.NET Core
 // dùng FileSystemWatcher/inotify để tự nạp lại appsettings.json khi file đổi, tính
@@ -36,6 +39,29 @@ var connectionString = builder.Configuration.GetConnectionString("DmsDb")
         "trường ConnectionStrings__DmsDb.");
 
 builder.Services.AddDbContext<DmsDbContext>(options => options.UseNpgsql(connectionString));
+
+// JWT secret đọc từ User Secrets (local) / biến môi trường Jwt__Secret (Render) —
+// cùng nguyên tắc bảo mật với ConnectionStrings__DmsDb, không commit secret thật.
+var jwtSecret = builder.Configuration["Jwt:Secret"]
+    ?? throw new InvalidOperationException(
+        "Thiếu Jwt:Secret. Local: chạy 'dotnet user-secrets set \"Jwt:Secret\" \"<chuỗi ngẫu nhiên " +
+        "dài, tối thiểu 32 ký tự>\"'. Render: thêm biến môi trường Jwt__Secret.");
+
+builder.Services.AddSingleton<JwtTokenService>();
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = false,
+            ValidateAudience = false,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
+            ClockSkew = TimeSpan.FromMinutes(2)
+        };
+    });
+builder.Services.AddAuthorization();
 
 // Blazor WASM chạy trên domain khác API khi deploy lên Render (2 service riêng biệt)
 // nên bắt buộc bật CORS. Danh sách origin đọc từ appsettings để không phải sửa code
@@ -75,6 +101,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseCors("BlazorClient");
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 // Endpoint nhẹ để cron-job ping định kỳ giữ service không bị Render free tier

@@ -1,6 +1,42 @@
-﻿<Router AppAssembly="@typeof(App).Assembly" NotFoundPage="typeof(Pages.NotFound)">
+@using DmsBlazor.Client.Auth
+@inject AuthState Auth
+@inject NavigationManager Nav
+
+<Router AppAssembly="@typeof(App).Assembly" NotFoundPage="typeof(Pages.NotFound)">
     <Found Context="routeData">
-        <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)"/>
-        <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+        @if (IsPublicRoute(routeData) || Auth.IsAuthenticated)
+        {
+            <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)"/>
+            <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+        }
+        else
+        {
+            // Chưa đăng nhập mà vào trang cần xác thực — điều hướng ngay, không render
+            // nội dung trang (tránh lộ dữ liệu trong 1 khoảnh khắc trước khi redirect).
+        }
     </Found>
 </Router>
+
+@code {
+    protected override void OnInitialized()
+    {
+        Nav.LocationChanged += (_, _) => RedirectIfNeeded();
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender) RedirectIfNeeded();
+    }
+
+    private static bool IsPublicRoute(Microsoft.AspNetCore.Components.RouteData routeData) =>
+        routeData.PageType == typeof(Pages.DangNhap) || routeData.PageType == typeof(Pages.NotFound);
+
+    private void RedirectIfNeeded()
+    {
+        var relativePath = Nav.ToBaseRelativePath(Nav.Uri);
+        var isLoginPage = relativePath.TrimEnd('/').Equals("dang-nhap", StringComparison.OrdinalIgnoreCase);
+
+        if (!Auth.IsAuthenticated && !isLoginPage)
+            Nav.NavigateTo("/dang-nhap");
+    }
+}

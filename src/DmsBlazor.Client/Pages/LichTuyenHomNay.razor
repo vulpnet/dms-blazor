@@ -1,8 +1,10 @@
 @page "/lich-tuyen-hom-nay"
 @using DmsBlazor.Shared.Models
 @using DmsBlazor.Client.Services
+@using DmsBlazor.Client.Auth
 @inject DmsApiClient Api
 @inject NavigationManager Nav
+@inject AuthState Auth
 
 <PageTitle>Lịch tuyến hôm nay — DMS</PageTitle>
 
@@ -21,15 +23,18 @@ else if (reps.Count == 0)
 }
 else
 {
-    <div class="field">
-        <label for="rep-select">Bạn là</label>
-        <select id="rep-select" @bind="selectedRepId" @bind:after="LoadToday">
-            @foreach (var r in reps)
-            {
-                <option value="@r.Id">@r.Name</option>
-            }
-        </select>
-    </div>
+    @if (Auth.Role == UserRole.Admin)
+    {
+        <div class="field">
+            <label for="rep-select">Bạn là</label>
+            <select id="rep-select" @bind="selectedRepId" @bind:after="LoadToday">
+                @foreach (var r in reps)
+                {
+                    <option value="@r.Id">@r.Name</option>
+                }
+            </select>
+        </div>
+    }
 
     @if (stops is null)
     {
@@ -247,7 +252,13 @@ else
     protected override async Task OnInitializedAsync()
     {
         reps = await Api.GetSalesRepsAsync();
-        selectedRepId = reps?.FirstOrDefault()?.Id ?? 0;
+
+        // NVBH tự động thấy đúng lịch của mình theo tài khoản đăng nhập, không tự chọn
+        // dropdown — chỉ Admin (xem thay/hỗ trợ) mới có quyền đổi giữa các NVBH.
+        selectedRepId = Auth.Role == UserRole.SalesRep && Auth.LinkedSalesRepId.HasValue
+            ? Auth.LinkedSalesRepId.Value
+            : reps?.FirstOrDefault()?.Id ?? 0;
+
         if (selectedRepId != 0) await LoadToday();
     }
 

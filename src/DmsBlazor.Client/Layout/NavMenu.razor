@@ -1,5 +1,8 @@
 @implements IDisposable
+@using DmsBlazor.Shared.Models
+@using DmsBlazor.Client.Auth
 @inject NavigationManager Nav
+@inject AuthState Auth
 
 <div class="sidebar @(collapseNavMenu ? "" : "open")">
     <div class="brand-row">
@@ -16,7 +19,7 @@
             </NavLink>
         </div>
 
-        @foreach (var group in Groups)
+        @foreach (var group in VisibleGroups)
         {
             var isOpen = openGroups.Contains(group.Label);
             <div class="nav-group">
@@ -35,12 +38,32 @@
                 </div>
             </div>
         }
+
+        @if (Auth.Role == UserRole.Admin)
+        {
+            <div class="nav-item">
+                <NavLink class="nav-link" href="tai-khoan">
+                    <span class="nav-icon">🔑</span> Quản lý tài khoản
+                </NavLink>
+            </div>
+        }
     </nav>
+
+    @if (Auth.IsAuthenticated)
+    {
+        <div class="user-row">
+            <div class="user-info">
+                <div class="user-name">@Auth.DisplayName</div>
+                <div class="user-role">@RoleLabel(Auth.Role)</div>
+            </div>
+            <button class="btn-logout" title="Đăng xuất" @onclick="Logout">⏻</button>
+        </div>
+    }
 </div>
 
 @code {
-    private record NavItem(string Href, string Icon, string Label);
-    private record NavGroup(string Label, NavItem[] Items);
+    private record NavItem(string Href, string Icon, string Label, UserRole[]? Roles = null);
+    private record NavGroup(string Label, NavItem[] Items, UserRole[]? Roles = null);
 
     private static readonly NavGroup[] Groups =
     [
@@ -48,24 +71,34 @@
             new("dashboard", "📊", "Báo cáo quản trị"),
         ]),
         new("Bán hàng", [
-            new("lich-tuyen-hom-nay", "🗓️", "Lịch tuyến hôm nay"),
-            new("dat-hang", "🛒", "Đặt hàng"),
-            new("don-hang", "📋", "Đơn hàng"),
-            new("cong-no", "💰", "Công nợ"),
-            new("tuyen-ban-hang", "🧭", "Tuyến bán hàng"),
-        ]),
+            new("lich-tuyen-hom-nay", "🗓️", "Lịch tuyến hôm nay", [UserRole.Admin, UserRole.SalesRep]),
+            new("dat-hang", "🛒", "Đặt hàng", [UserRole.Admin, UserRole.SalesRep]),
+            new("don-hang", "📋", "Đơn hàng", [UserRole.Admin, UserRole.SalesRep]),
+            new("cong-no", "💰", "Công nợ", [UserRole.Admin, UserRole.Accountant]),
+            new("tuyen-ban-hang", "🧭", "Tuyến bán hàng", [UserRole.Admin, UserRole.SalesRep]),
+        ], [UserRole.Admin, UserRole.SalesRep, UserRole.Accountant]),
         new("Vận chuyển", [
-            new("van-chuyen", "🚚", "Chuyến giao hàng"),
-            new("tai-xe", "🧑‍✈️", "Tài xế"),
-            new("ton-kho", "📦", "Tồn kho"),
-        ]),
+            new("van-chuyen", "🚚", "Chuyến giao hàng", [UserRole.Admin, UserRole.Driver]),
+            new("tai-xe", "🧑‍✈️", "Tài xế", [UserRole.Admin, UserRole.Driver]),
+            new("ton-kho", "📦", "Tồn kho", [UserRole.Admin, UserRole.Warehouse]),
+        ], [UserRole.Admin, UserRole.Driver, UserRole.Warehouse]),
         new("Danh mục", [
             new("san-pham", "🏷️", "Sản phẩm"),
             new("khach-hang", "🧑‍🤝‍🧑", "Khách hàng"),
             new("nha-phan-phoi", "🏢", "Nhà phân phối"),
             new("nhan-vien-ban-hang", "🧑‍💼", "Nhân viên bán hàng"),
-        ]),
+        ], [UserRole.Admin]),
     ];
+
+    // Admin thấy hết mọi trang, không bị lọc theo Roles của bất kỳ nhóm/mục nào.
+    private IEnumerable<NavGroup> VisibleGroups =>
+        Groups
+            .Where(g => Auth.Role == UserRole.Admin || g.Roles is null || g.Roles.Contains(Auth.Role!.Value))
+            .Select(g => g with
+            {
+                Items = g.Items.Where(i => Auth.Role == UserRole.Admin || i.Roles is null || i.Roles.Contains(Auth.Role!.Value)).ToArray()
+            })
+            .Where(g => g.Items.Length > 0);
 
     private bool collapseNavMenu = true;
     // Nhóm chứa trang đang xem tự mở khi tải trang; các nhóm khác mặc định thu gọn
@@ -100,6 +133,22 @@
     {
         collapseNavMenu = !collapseNavMenu;
     }
+
+    private async Task Logout()
+    {
+        await Auth.SignOutAsync();
+        Nav.NavigateTo("/dang-nhap", forceLoad: true);
+    }
+
+    private static string RoleLabel(UserRole? role) => role switch
+    {
+        UserRole.Admin => "Quản lý",
+        UserRole.SalesRep => "Nhân viên bán hàng",
+        UserRole.Driver => "Tài xế",
+        UserRole.Warehouse => "Thủ kho",
+        UserRole.Accountant => "Kế toán công nợ",
+        _ => ""
+    };
 
     public void Dispose()
     {

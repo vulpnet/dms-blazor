@@ -1,5 +1,6 @@
 using DmsBlazor.Api.Data;
 using DmsBlazor.Shared.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,6 +16,7 @@ namespace DmsBlazor.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Roles = $"{nameof(UserRole.Admin)},{nameof(UserRole.Accountant)}")]
 public class DistributorPaymentsController(DmsDbContext db) : ControllerBase
 {
     [HttpGet("debts")]

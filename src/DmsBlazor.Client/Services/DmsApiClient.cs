@@ -6,6 +6,38 @@ namespace DmsBlazor.Client.Services;
 /// <summary>Gọi tập trung các API của backend — các trang .razor không tự gọi HttpClient rải rác.</summary>
 public class DmsApiClient(HttpClient http)
 {
+    // ===== Đăng nhập & quản lý tài khoản =====
+
+    public async Task<(LoginResponse? Result, string? Error)> LoginAsync(LoginRequest request)
+    {
+        var res = await http.PostAsJsonAsync("api/auth/login", request);
+        if (!res.IsSuccessStatusCode) return (null, await res.Content.ReadAsStringAsync());
+        return (await res.Content.ReadFromJsonAsync<LoginResponse>(), null);
+    }
+
+    public Task<List<User>?> GetUsersAsync() =>
+        http.GetFromJsonAsync<List<User>>("api/users");
+
+    public async Task<(bool Success, string? Error)> CreateUserAsync(CreateUserRequest request)
+    {
+        var res = await http.PostAsJsonAsync("api/users", request);
+        if (res.IsSuccessStatusCode) return (true, null);
+        return (false, await res.Content.ReadAsStringAsync());
+    }
+
+    public async Task<(bool Success, string? Error)> UpdateUserAsync(int id, UpdateUserRequest request)
+    {
+        var res = await http.PutAsJsonAsync($"api/users/{id}", request);
+        if (res.IsSuccessStatusCode) return (true, null);
+        return (false, await res.Content.ReadAsStringAsync());
+    }
+
+    public async Task<bool> DeleteUserAsync(int id)
+    {
+        var res = await http.DeleteAsync($"api/users/{id}");
+        return res.IsSuccessStatusCode;
+    }
+
     public Task<List<Distributor>?> GetDistributorsAsync() =>
         http.GetFromJsonAsync<List<Distributor>>("api/catalog/distributors");
 

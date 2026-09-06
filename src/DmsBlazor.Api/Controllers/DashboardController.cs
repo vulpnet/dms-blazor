@@ -1,5 +1,6 @@
 using DmsBlazor.Api.Data;
 using DmsBlazor.Shared.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -9,6 +10,7 @@ namespace DmsBlazor.Api.Controllers;
 /// trang Báo cáo quản trị — trước đây trả dữ liệu demo tĩnh (MockData.GetDashboard).</summary>
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class DashboardController(DmsDbContext db) : ControllerBase
 {
     [HttpGet]

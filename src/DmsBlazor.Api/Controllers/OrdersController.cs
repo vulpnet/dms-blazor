@@ -1,6 +1,7 @@
 using DmsBlazor.Api.Data;
 using DmsBlazor.Shared.Models;
 using DmsBlazor.Shared.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,6 +9,7 @@ namespace DmsBlazor.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Roles = $"{nameof(UserRole.Admin)},{nameof(UserRole.SalesRep)}")]
 public class OrdersController(DmsDbContext db) : ControllerBase
 {
     // Tính giá + khuyến mãi cho giỏ hàng hiện tại — gọi mỗi khi khách đổi số lượng,

@@ -46,6 +46,20 @@ public static class DbInitializer
             db.Warehouses.Add(new Shared.Models.Warehouse { Name = "Kho tổng", Type = Shared.Models.WarehouseType.Central });
         }
 
+        // Tài khoản Admin mặc định — chỉ tạo nếu CHƯA có tài khoản nào (tránh tạo
+        // lại sau khi đã đổi mật khẩu). Mật khẩu mặc định "admin123" — PHẢI đổi ngay
+        // sau lần đăng nhập đầu tiên qua màn hình Quản lý tài khoản.
+        if (!await db.Users.AnyAsync())
+        {
+            db.Users.Add(new Shared.Models.User
+            {
+                Username = "admin",
+                PasswordHash = PasswordHasher.Hash("admin123"),
+                DisplayName = "Quản trị viên",
+                Role = Shared.Models.UserRole.Admin
+            });
+        }
+
         await db.SaveChangesAsync();
     }
 }

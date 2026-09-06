@@ -1,5 +1,6 @@
 using DmsBlazor.Api.Data;
 using DmsBlazor.Shared.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,6 +11,7 @@ namespace DmsBlazor.Api.Controllers;
 /// không lưu bảng riêng. Client tự polling định kỳ, không dùng SignalR/WebSocket.</summary>
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class NotificationsController(DmsDbContext db) : ControllerBase
 {
     [HttpGet]

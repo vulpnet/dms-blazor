@@ -21,6 +21,7 @@ public class DmsDbContext(DbContextOptions<DmsDbContext> options) : DbContext(op
     public DbSet<InventoryStock> InventoryStocks => Set<InventoryStock>();
     public DbSet<InventoryTransaction> InventoryTransactions => Set<InventoryTransaction>();
     public DbSet<DistributorPayment> DistributorPayments => Set<DistributorPayment>();
+    public DbSet<User> Users => Set<User>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -183,6 +184,16 @@ public class DmsDbContext(DbContextOptions<DmsDbContext> options) : DbContext(op
             e.Property(x => x.ProductName).HasMaxLength(200);
             e.Property(x => x.Note).HasMaxLength(500);
             e.Property(x => x.RefCode).HasMaxLength(30);
+        });
+
+        modelBuilder.Entity<User>(e =>
+        {
+            e.ToTable("users");
+            e.Property(x => x.Username).HasMaxLength(50).IsRequired();
+            e.HasIndex(x => x.Username).IsUnique();
+            e.Property(x => x.PasswordHash).HasMaxLength(200).IsRequired();
+            e.Property(x => x.DisplayName).HasMaxLength(200).IsRequired();
+            e.Property(x => x.IsActive).HasDefaultValue(true);
         });
     }
 }

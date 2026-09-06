@@ -1,5 +1,6 @@
 using DmsBlazor.Api.Data;
 using DmsBlazor.Shared.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -7,6 +8,7 @@ namespace DmsBlazor.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Roles = $"{nameof(UserRole.Admin)},{nameof(UserRole.SalesRep)}")]
 public class CatalogController(DmsDbContext db) : ControllerBase
 {
     // Dùng cho màn hình đặt hàng — chỉ trả nhà phân phối/khách hàng đang hoạt động.

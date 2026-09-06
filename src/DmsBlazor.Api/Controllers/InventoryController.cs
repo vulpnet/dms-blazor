@@ -1,5 +1,6 @@
 using DmsBlazor.Api.Data;
 using DmsBlazor.Shared.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -7,6 +8,7 @@ namespace DmsBlazor.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Roles = $"{nameof(UserRole.Admin)},{nameof(UserRole.Warehouse)}")]
 public class InventoryController(DmsDbContext db) : ControllerBase
 {
     [HttpGet("stocks")]
