@@ -40,3 +40,17 @@ public class DistributorDebt
     public decimal CurrentDebt { get; set; }    // TotalOrdered - TotalPaid
     public bool OverLimit { get; set; }
 }
+
+/// <summary>Lịch sử thay đổi % chiết khấu riêng của 1 NPP — Distributor.ExtraDiscountPercent
+/// chỉ giữ giá trị hiện tại (để không phải sửa logic tính giá đơn hàng), bảng này ghi lại
+/// mỗi lần đổi để biết % nào áp dụng cho đơn hàng ở thời điểm nào trong quá khứ.</summary>
+public class DistributorDiscountHistory
+{
+    public int Id { get; set; }
+    public int DistributorId { get; set; }
+    public decimal OldPercent { get; set; }
+    public decimal NewPercent { get; set; }
+    public string ChangedByUsername { get; set; } = "";
+    public DateTimeOffset ChangedAt { get; set; }
+    public string? Note { get; set; }
+}

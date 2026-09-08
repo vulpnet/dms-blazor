@@ -224,6 +224,9 @@ public class DmsApiClient(HttpClient http)
         return (false, await res.Content.ReadAsStringAsync());
     }
 
+    public Task<List<DistributorDiscountHistory>?> GetDistributorDiscountHistoryAsync(int id) =>
+        http.GetFromJsonAsync<List<DistributorDiscountHistory>>($"api/distributors/{id}/discount-history");
+
     public async Task<bool> DeleteDistributorAsync(int id)
     {
         var res = await http.DeleteAsync($"api/distributors/{id}");

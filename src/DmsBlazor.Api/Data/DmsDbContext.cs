@@ -23,6 +23,7 @@ public class DmsDbContext(DbContextOptions<DmsDbContext> options) : DbContext(op
     public DbSet<DistributorPayment> DistributorPayments => Set<DistributorPayment>();
     public DbSet<User> Users => Set<User>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<DistributorDiscountHistory> DistributorDiscountHistories => Set<DistributorDiscountHistory>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -208,6 +209,16 @@ public class DmsDbContext(DbContextOptions<DmsDbContext> options) : DbContext(op
             // Truy vấn phổ biến nhất: xem log gần đây theo loại thực thể — index
             // giúp tránh full scan khi bảng lớn dần theo thời gian.
             e.HasIndex(x => new { x.EntityType, x.CreatedAt });
+        });
+
+        modelBuilder.Entity<DistributorDiscountHistory>(e =>
+        {
+            e.ToTable("distributor_discount_histories");
+            e.Property(x => x.ChangedByUsername).HasMaxLength(50).IsRequired();
+            e.Property(x => x.Note).HasMaxLength(500);
+            e.Property(x => x.OldPercent).HasPrecision(5, 2);
+            e.Property(x => x.NewPercent).HasPrecision(5, 2);
+            e.HasIndex(x => new { x.DistributorId, x.ChangedAt });
         });
     }
 }

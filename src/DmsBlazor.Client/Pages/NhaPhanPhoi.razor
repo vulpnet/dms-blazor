@@ -68,6 +68,7 @@ else
                         </td>
                         <td class="row-actions">
                             <button class="btn-link" @onclick="() => OpenEditForm(d)">Sửa</button>
+                            <button class="btn-link" @onclick="() => OpenDiscountHistory(d)">Lịch sử chiết khấu</button>
                             <button class="btn-link danger" @onclick="() => ConfirmDelete(d)">Xoá</button>
                         </td>
                     </tr>
@@ -125,6 +126,44 @@ else
                     </button>
                 </div>
             </EditForm>
+        </div>
+    </div>
+}
+
+@if (viewingHistoryFor is not null)
+{
+    <div class="modal-backdrop" @onclick="() => viewingHistoryFor = null">
+        <div class="modal-panel" @onclick:stopPropagation="true">
+            <h3>Lịch sử chiết khấu — @viewingHistoryFor.Name</h3>
+            <p class="muted">Chiết khấu hiện tại: <b>@viewingHistoryFor.ExtraDiscountPercent%</b></p>
+
+            @if (discountHistory is null)
+            {
+                <p class="muted">Đang tải...</p>
+            }
+            else if (discountHistory.Count == 0)
+            {
+                <p class="muted">Chưa có lần thay đổi nào.</p>
+            }
+            else
+            {
+                <ul class="history-list">
+                    @foreach (var h in discountHistory)
+                    {
+                        <li>
+                            <div>
+                                <b>@h.OldPercent%</b> → <b>@h.NewPercent%</b>
+                                <span class="muted"> bởi @h.ChangedByUsername</span>
+                            </div>
+                            <div class="muted">@h.ChangedAt.ToLocalTime().ToString("HH:mm dd/MM/yyyy")</div>
+                        </li>
+                    }
+                </ul>
+            }
+
+            <div class="modal-actions">
+                <button class="btn-outline" @onclick="() => viewingHistoryFor = null">Đóng</button>
+            </div>
         </div>
     </div>
 }
@@ -195,6 +234,12 @@ else
         background: var(--danger); color: #fff; border: none;
         border-radius: 8px; padding: 0.6rem 1.2rem; font-weight: 600; cursor: pointer; font-size: 0.88rem;
     }
+    .history-list { list-style: none; margin: 0 0 0.5rem; padding: 0; max-height: 320px; overflow-y: auto; }
+    .history-list li {
+        display: flex; justify-content: space-between; gap: 0.75rem;
+        padding: 0.6rem 0; border-bottom: 1px solid var(--line); font-size: 0.85rem;
+    }
+    .history-list li:last-child { border-bottom: none; }
 </style>
 
 @code {
@@ -210,6 +255,9 @@ else
     private Distributor? confirmingDelete;
     private string searchText = "";
     private string statusFilter = "";
+
+    private Distributor? viewingHistoryFor;
+    private List<DistributorDiscountHistory>? discountHistory;
 
     private List<Distributor> FilteredDistributors => (distributors ?? [])
         .Where(d => string.IsNullOrWhiteSpace(searchText)
@@ -308,6 +356,13 @@ else
         };
         var (success, _) = await Api.UpdateDistributorAsync(d.Id, updated);
         if (!success) await LoadDistributors();
+    }
+
+    private async Task OpenDiscountHistory(Distributor d)
+    {
+        viewingHistoryFor = d;
+        discountHistory = null;
+        discountHistory = await Api.GetDistributorDiscountHistoryAsync(d.Id);
     }
 
     private void ConfirmDelete(Distributor d) => confirmingDelete = d;

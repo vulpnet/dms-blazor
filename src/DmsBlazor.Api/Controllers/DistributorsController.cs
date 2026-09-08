@@ -42,6 +42,21 @@ public class DistributorsController(DmsDbContext db, AuditLogger audit) : Contro
         var distributor = await db.Distributors.FindAsync(id);
         if (distributor is null) return NotFound();
 
+        // Ghi lịch sử TRƯỚC khi gán giá trị mới — cần giữ giá trị cũ để biết % nào
+        // đã áp dụng cho các đơn hàng trước thời điểm đổi.
+        var discountChanged = distributor.ExtraDiscountPercent != input.ExtraDiscountPercent;
+        if (discountChanged)
+        {
+            db.DistributorDiscountHistories.Add(new DistributorDiscountHistory
+            {
+                DistributorId = id,
+                OldPercent = distributor.ExtraDiscountPercent,
+                NewPercent = input.ExtraDiscountPercent,
+                ChangedByUsername = User.Identity?.Name ?? "",
+                ChangedAt = DateTimeOffset.UtcNow
+            });
+        }
+
         distributor.Name = input.Name;
         distributor.Region = input.Region;
         distributor.IsActive = input.IsActive;
@@ -49,9 +64,19 @@ public class DistributorsController(DmsDbContext db, AuditLogger audit) : Contro
         distributor.ExtraDiscountPercent = input.ExtraDiscountPercent;
 
         await db.SaveChangesAsync();
-        await audit.LogAsync(User, "Update", "Distributor", id.ToString(), $"Sửa nhà phân phối '{distributor.Name}'");
+        await audit.LogAsync(User, "Update", "Distributor", id.ToString(),
+            discountChanged
+                ? $"Sửa nhà phân phối '{distributor.Name}' — đổi chiết khấu thành {input.ExtraDiscountPercent}%"
+                : $"Sửa nhà phân phối '{distributor.Name}'");
         return NoContent();
     }
+
+    [HttpGet("{id:int}/discount-history")]
+    public async Task<ActionResult<List<DistributorDiscountHistory>>> GetDiscountHistory(int id) =>
+        await db.DistributorDiscountHistories
+            .Where(h => h.DistributorId == id)
+            .OrderByDescending(h => h.ChangedAt)
+            .ToListAsync();
 
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id)
