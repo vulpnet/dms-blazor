@@ -95,25 +95,36 @@ else
         }
         else
         {
-            <div class="card">
-                <table class="data-table">
-                    <thead>
-                        <tr><th></th><th>Sản phẩm</th><th>Kho</th><th class="text-right">Tồn hiện tại</th><th class="text-right">Ngưỡng cảnh báo</th></tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var a in lowStockAlerts)
-                        {
-                            <tr class="row-negative">
-                                <td>@a.Emoji</td>
-                                <td>@a.ProductName</td>
-                                <td>@a.WarehouseName</td>
-                                <td class="text-right">@a.Quantity.ToString("N0") @a.Unit</td>
-                                <td class="text-right">@a.Threshold.ToString("N0")</td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
+            <div class="filter-bar">
+                <input class="filter-search" @bind="lowStockSearchText" @bind:event="oninput" placeholder="Tìm theo tên sản phẩm, kho..." />
             </div>
+
+            @if (FilteredLowStockAlerts.Count == 0)
+            {
+                <p class="muted">Không có mục nào khớp bộ lọc.</p>
+            }
+            else
+            {
+                <div class="card">
+                    <table class="data-table">
+                        <thead>
+                            <tr><th></th><th>Sản phẩm</th><th>Kho</th><th class="text-right">Tồn hiện tại</th><th class="text-right">Ngưỡng cảnh báo</th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var a in FilteredLowStockAlerts)
+                            {
+                                <tr class="row-negative">
+                                    <td>@a.Emoji</td>
+                                    <td>@a.ProductName</td>
+                                    <td>@a.WarehouseName</td>
+                                    <td class="text-right">@a.Quantity.ToString("N0") @a.Unit</td>
+                                    <td class="text-right">@a.Threshold.ToString("N0")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
         }
     }
     else
@@ -129,27 +140,38 @@ else
         }
         else
         {
-            <div class="card">
-                <table class="data-table">
-                    <thead>
-                        <tr><th></th><th>Sản phẩm</th><th>Kho</th><th class="text-right">Tồn hiện tại</th><th class="text-right">Bán TB/ngày</th><th class="text-right">Còn (ngày)</th><th class="text-right">Đề xuất đặt thêm</th></tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var r in reorderSuggestions)
-                        {
-                            <tr>
-                                <td>@r.Emoji</td>
-                                <td>@r.ProductName</td>
-                                <td>@r.WarehouseName</td>
-                                <td class="text-right">@r.Quantity.ToString("N0") @r.Unit</td>
-                                <td class="text-right">@r.AvgDailyUsage.ToString("N1")</td>
-                                <td class="text-right">@(r.DaysUntilStockout?.ToString("N0") ?? "—")</td>
-                                <td class="text-right reorder-qty">+@r.SuggestedReorderQty.ToString("N0")</td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
+            <div class="filter-bar">
+                <input class="filter-search" @bind="reorderSearchText" @bind:event="oninput" placeholder="Tìm theo tên sản phẩm, kho..." />
             </div>
+
+            @if (FilteredReorderSuggestions.Count == 0)
+            {
+                <p class="muted">Không có mục nào khớp bộ lọc.</p>
+            }
+            else
+            {
+                <div class="card">
+                    <table class="data-table">
+                        <thead>
+                            <tr><th></th><th>Sản phẩm</th><th>Kho</th><th class="text-right">Tồn hiện tại</th><th class="text-right">Bán TB/ngày</th><th class="text-right">Còn (ngày)</th><th class="text-right">Đề xuất đặt thêm</th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var r in FilteredReorderSuggestions)
+                            {
+                                <tr>
+                                    <td>@r.Emoji</td>
+                                    <td>@r.ProductName</td>
+                                    <td>@r.WarehouseName</td>
+                                    <td class="text-right">@r.Quantity.ToString("N0") @r.Unit</td>
+                                    <td class="text-right">@r.AvgDailyUsage.ToString("N1")</td>
+                                    <td class="text-right">@(r.DaysUntilStockout?.ToString("N0") ?? "—")</td>
+                                    <td class="text-right reorder-qty">+@r.SuggestedReorderQty.ToString("N0")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
         }
     }
 }
@@ -301,6 +323,8 @@ else
     private List<ReorderSuggestion>? reorderSuggestions;
     private int selectedWarehouseId;
     private string searchText = "";
+    private string lowStockSearchText = "";
+    private string reorderSearchText = "";
     private string activeTab = "stocks";
 
     private bool showStockInForm;
@@ -316,6 +340,18 @@ else
         .Where(s => string.IsNullOrWhiteSpace(searchText)
             || s.ProductCode.Contains(searchText, StringComparison.OrdinalIgnoreCase)
             || s.ProductName.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+        .ToList();
+
+    private List<LowStockAlert> FilteredLowStockAlerts => (lowStockAlerts ?? [])
+        .Where(a => string.IsNullOrWhiteSpace(lowStockSearchText)
+            || a.ProductName.Contains(lowStockSearchText, StringComparison.OrdinalIgnoreCase)
+            || a.WarehouseName.Contains(lowStockSearchText, StringComparison.OrdinalIgnoreCase))
+        .ToList();
+
+    private List<ReorderSuggestion> FilteredReorderSuggestions => (reorderSuggestions ?? [])
+        .Where(r => string.IsNullOrWhiteSpace(reorderSearchText)
+            || r.ProductName.Contains(reorderSearchText, StringComparison.OrdinalIgnoreCase)
+            || r.WarehouseName.Contains(reorderSearchText, StringComparison.OrdinalIgnoreCase))
         .ToList();
 
     protected override async Task OnInitializedAsync()
