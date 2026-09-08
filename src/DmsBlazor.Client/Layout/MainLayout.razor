@@ -1,12 +1,22 @@
 @inherits LayoutComponentBase
+@using DmsBlazor.Shared.Models
+@using DmsBlazor.Client.Auth
+@inject AuthState Auth
+
 <div class="page">
     <NavMenu />
 
     <main>
         <div class="top-row px-4">
             <span class="env-badge">Dữ liệu demo</span>
-            <NotificationBell />
             <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">Tài liệu kỹ thuật</a>
+            <div class="top-row-right">
+                @if (Auth.Role != UserRole.Driver)
+                {
+                    <DistributorPicker />
+                }
+                <NotificationBell />
+            </div>
         </div>
 
         <article class="content px-4">

@@ -32,6 +32,13 @@ main {
     color: var(--brand, #1e4fd6);
 }
 
+.top-row-right {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-left: auto;
+}
+
 .env-badge {
     font-size: 0.72rem;
     font-weight: 600;

@@ -15,6 +15,7 @@ var apiBaseUrl = builder.Configuration["ApiBaseUrl"]
     ?? throw new InvalidOperationException("Thiếu cấu hình ApiBaseUrl trong wwwroot/appsettings.json");
 
 builder.Services.AddSingleton<AuthState>();
+builder.Services.AddSingleton<SelectedDistributorState>();
 builder.Services.AddTransient<JwtAuthorizationHandler>();
 
 builder.Services.AddScoped(sp =>

@@ -1,7 +1,10 @@
 @page "/ton-kho"
 @using DmsBlazor.Shared.Models
 @using DmsBlazor.Client.Services
+@using DmsBlazor.Client.Auth
+@implements IDisposable
 @inject DmsApiClient Api
+@inject SelectedDistributorState SelectedDistributor
 
 <PageTitle>Tồn kho — DMS</PageTitle>
 
@@ -39,6 +42,11 @@ else
                 }
             </select>
         </div>
+
+        @if (SelectedDistributor.DistributorId is not null && WarehouseIdForSelectedDistributor() is null)
+        {
+            <p class="muted">Nhà phân phối <b>@SelectedDistributor.DistributorName</b> chưa có kho riêng — đang hiện kho đã chọn thủ công bên dưới.</p>
+        }
 
         <div class="filter-bar">
             <input class="filter-search" @bind="searchText" @bind:event="oninput" placeholder="Tìm theo mã, tên sản phẩm..." />
@@ -312,10 +320,41 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        SelectedDistributor.Changed += OnHeaderDistributorChanged;
+
         warehouses = await Api.GetWarehousesAsync() ?? [];
         products = await Api.GetManagedProductsAsync() ?? [];
-        selectedWarehouseId = warehouses.FirstOrDefault(w => w.Type == WarehouseType.Central)?.Id ?? warehouses.FirstOrDefault()?.Id ?? 0;
+
+        // NPP chọn ở header ánh xạ sang đúng kho riêng của NPP đó (Warehouse.DistributorId)
+        // — mỗi NPP có 1 kho tương ứng, không có kho nào là "kho chung của nhiều NPP".
+        selectedWarehouseId = WarehouseIdForSelectedDistributor()
+            ?? warehouses.FirstOrDefault(w => w.Type == WarehouseType.Central)?.Id
+            ?? warehouses.FirstOrDefault()?.Id ?? 0;
+
         await LoadStocks();
+    }
+
+    private int? WarehouseIdForSelectedDistributor() =>
+        SelectedDistributor.DistributorId is { } distributorId
+            ? warehouses?.FirstOrDefault(w => w.DistributorId == distributorId)?.Id
+            : null;
+
+    private async void OnHeaderDistributorChanged()
+    {
+        var warehouseId = WarehouseIdForSelectedDistributor();
+        if (warehouseId is null) return;
+
+        selectedWarehouseId = warehouseId.Value;
+        await InvokeAsync(async () =>
+        {
+            await LoadStocks();
+            StateHasChanged();
+        });
+    }
+
+    public void Dispose()
+    {
+        SelectedDistributor.Changed -= OnHeaderDistributorChanged;
     }
 
     private async Task LoadStocks()

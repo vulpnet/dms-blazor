@@ -1,7 +1,10 @@
 @page "/cong-no"
 @using DmsBlazor.Shared.Models
 @using DmsBlazor.Client.Services
+@using DmsBlazor.Client.Auth
+@implements IDisposable
 @inject DmsApiClient Api
+@inject SelectedDistributorState SelectedDistributor
 
 <PageTitle>Công nợ nhà phân phối — DMS</PageTitle>
 
@@ -23,6 +26,11 @@ else
             Chỉ hiện NPP vượt hạn mức
         </label>
     </div>
+
+    @if (SelectedDistributor.DistributorId is not null)
+    {
+        <p class="muted">Đang lọc theo nhà phân phối: <b>@SelectedDistributor.DistributorName</b> (đổi ở góc trên bên phải).</p>
+    }
 
     @if (FilteredDebts.Count == 0)
     {
@@ -186,13 +194,22 @@ else
     private bool saving;
 
     private List<DistributorDebt> FilteredDebts => (debts ?? [])
+        .Where(d => SelectedDistributor.DistributorId is null || d.DistributorId == SelectedDistributor.DistributorId)
         .Where(d => string.IsNullOrWhiteSpace(searchText) || d.DistributorName.Contains(searchText, StringComparison.OrdinalIgnoreCase))
         .Where(d => !onlyOverLimit || d.OverLimit)
         .ToList();
 
     protected override async Task OnInitializedAsync()
     {
+        SelectedDistributor.Changed += OnHeaderDistributorChanged;
         debts = await Api.GetDebtsAsync();
+    }
+
+    private void OnHeaderDistributorChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        SelectedDistributor.Changed -= OnHeaderDistributorChanged;
     }
 
     private async Task ToggleHistory(int distributorId)

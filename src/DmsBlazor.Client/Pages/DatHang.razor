@@ -2,8 +2,11 @@
 @using System.Web
 @using DmsBlazor.Shared.Models
 @using DmsBlazor.Client.Services
+@using DmsBlazor.Client.Auth
+@implements IDisposable
 @inject DmsApiClient Api
 @inject NavigationManager Nav
+@inject SelectedDistributorState SelectedDistributor
 
 <PageTitle>Đặt hàng — DMS</PageTitle>
 
@@ -33,6 +36,10 @@ else
                 @if (distributors.Count == 0)
                 {
                     <p class="muted">Chưa có nhà phân phối nào đang hợp tác — <a href="/nha-phan-phoi">thêm nhà phân phối</a> trước khi đặt đơn kênh này.</p>
+                }
+                else if (SelectedDistributor.DistributorId is { } headerDistributorId)
+                {
+                    <p class="muted">Tạo đơn cho nhà phân phối: <b>@SelectedDistributor.DistributorName</b> (chọn ở góc trên bên phải).</p>
                 }
                 else
                 {
@@ -272,6 +279,8 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        SelectedDistributor.Changed += OnHeaderDistributorChanged;
+
         products = await Api.GetProductsAsync();
         distributors = await Api.GetDistributorsAsync();
         customers = await Api.GetCustomersAsync();
@@ -284,14 +293,33 @@ else
         if (Enum.TryParse<SalesChannel>(query["channel"], out var preselectedChannel))
             channel = preselectedChannel;
 
-        selectedDistributorId = int.TryParse(query["distributorId"], out var distId) && distributors?.Any(d => d.Id == distId) == true
-            ? distId
-            : distributors?.FirstOrDefault()?.Id ?? 0;
+        // NPP chọn ở dropdown header (nếu có) ưu tiên hơn dropdown riêng trong trang —
+        // tránh 2 nguồn sự thật khác nhau cho cùng 1 đơn hàng.
+        selectedDistributorId = SelectedDistributor.DistributorId
+            ?? (int.TryParse(query["distributorId"], out var distId) && distributors?.Any(d => d.Id == distId) == true
+                ? distId
+                : distributors?.FirstOrDefault()?.Id ?? 0);
         selectedCustomerId = int.TryParse(query["customerId"], out var custId) && customers?.Any(c => c.Id == custId) == true
             ? custId
             : customers?.FirstOrDefault()?.Id ?? 0;
 
         await RefreshPrice();
+    }
+
+    private async void OnHeaderDistributorChanged()
+    {
+        if (SelectedDistributor.DistributorId is not { } id) return;
+        selectedDistributorId = id;
+        await InvokeAsync(async () =>
+        {
+            await RefreshPrice();
+            StateHasChanged();
+        });
+    }
+
+    public void Dispose()
+    {
+        SelectedDistributor.Changed -= OnHeaderDistributorChanged;
     }
 
     private void SetChannel(SalesChannel c)

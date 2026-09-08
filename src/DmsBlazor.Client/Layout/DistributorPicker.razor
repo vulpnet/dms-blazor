@@ -1,0 +1,58 @@
+@using DmsBlazor.Shared.Models
+@using DmsBlazor.Client.Services
+@using DmsBlazor.Client.Auth
+@implements IDisposable
+@inject DmsApiClient Api
+@inject SelectedDistributorState Selected
+
+@if (distributors is { Count: > 0 })
+{
+    <select class="distributor-picker" @bind="selectedId" @bind:after="OnChanged" title="Nhà phân phối đang thao tác">
+        <option value="0">Tất cả NPP</option>
+        @foreach (var d in distributors)
+        {
+            <option value="@d.Id">@d.Name</option>
+        }
+    </select>
+}
+
+<style>
+    .distributor-picker {
+        padding: 0.4rem 0.6rem;
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        font-size: 0.83rem;
+        background: var(--surface);
+        color: var(--ink);
+        max-width: 220px;
+    }
+</style>
+
+@code {
+    private List<Distributor>? distributors;
+    private int selectedId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Selected.Changed += OnExternalChange;
+        distributors = await Api.GetDistributorsAsync() ?? [];
+        selectedId = Selected.DistributorId ?? 0;
+    }
+
+    private void OnExternalChange()
+    {
+        selectedId = Selected.DistributorId ?? 0;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnChanged()
+    {
+        var distributor = distributors?.FirstOrDefault(d => d.Id == selectedId);
+        Selected.Select(distributor?.Id, distributor?.Name);
+    }
+
+    public void Dispose()
+    {
+        Selected.Changed -= OnExternalChange;
+    }
+}
