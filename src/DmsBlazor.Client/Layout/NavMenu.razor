@@ -91,13 +91,15 @@
     ];
 
     // Admin thấy hết mọi trang, không bị lọc theo Roles của bất kỳ nhóm/mục nào.
+    // Auth.Role có thể null trong khoảnh khắc App.razor chưa kịp redirect về trang
+    // đăng nhập — không dùng Auth.Role!.Value ở đây để tránh ném exception lúc đó.
+    private bool IsVisible(UserRole[]? allowedRoles) =>
+        Auth.Role == UserRole.Admin || allowedRoles is null || (Auth.Role is { } role && allowedRoles.Contains(role));
+
     private IEnumerable<NavGroup> VisibleGroups =>
         Groups
-            .Where(g => Auth.Role == UserRole.Admin || g.Roles is null || g.Roles.Contains(Auth.Role!.Value))
-            .Select(g => g with
-            {
-                Items = g.Items.Where(i => Auth.Role == UserRole.Admin || i.Roles is null || i.Roles.Contains(Auth.Role!.Value)).ToArray()
-            })
+            .Where(g => IsVisible(g.Roles))
+            .Select(g => g with { Items = g.Items.Where(i => IsVisible(i.Roles)).ToArray() })
             .Where(g => g.Items.Length > 0);
 
     private bool collapseNavMenu = true;
