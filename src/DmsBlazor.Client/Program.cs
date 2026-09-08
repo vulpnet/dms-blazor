@@ -19,6 +19,9 @@ builder.Services.AddTransient<JwtAuthorizationHandler>();
 
 builder.Services.AddScoped(sp =>
 {
+    // WASM chạy trong trình duyệt, gọi HTTP qua fetch() của browser — không dùng
+    // HttpClientHandler (chỉ chạy được trên .NET desktop/server), phải dùng
+    // WasmHttpMessageHandler mặc định làm InnerHandler cuối chuỗi.
     var handler = sp.GetRequiredService<JwtAuthorizationHandler>();
     handler.InnerHandler = new HttpClientHandler();
     return new HttpClient(handler) { BaseAddress = new Uri(apiBaseUrl) };
@@ -26,5 +29,4 @@ builder.Services.AddScoped(sp =>
 builder.Services.AddScoped<DmsApiClient>();
 
 var host = builder.Build();
-await host.Services.GetRequiredService<AuthState>().InitializeAsync();
 await host.RunAsync();

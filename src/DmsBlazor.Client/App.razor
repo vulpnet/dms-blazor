@@ -1,32 +1,43 @@
+@implements IDisposable
 @using DmsBlazor.Client.Auth
 @inject AuthState Auth
 @inject NavigationManager Nav
 
-<Router AppAssembly="@typeof(App).Assembly" NotFoundPage="typeof(Pages.NotFound)">
-    <Found Context="routeData">
-        @if (IsPublicRoute(routeData) || Auth.IsAuthenticated)
-        {
-            <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)"/>
-            <FocusOnNavigate RouteData="@routeData" Selector="h1" />
-        }
-        else
-        {
-            // Chưa đăng nhập mà vào trang cần xác thực — điều hướng ngay, không render
-            // nội dung trang (tránh lộ dữ liệu trong 1 khoảnh khắc trước khi redirect).
-        }
-    </Found>
-</Router>
+@if (initialized)
+{
+    <Router AppAssembly="@typeof(App).Assembly" NotFoundPage="typeof(Pages.NotFound)">
+        <Found Context="routeData">
+            @if (IsPublicRoute(routeData) || Auth.IsAuthenticated)
+            {
+                <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)"/>
+                <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+            }
+            else
+            {
+                // Chưa đăng nhập mà vào trang cần xác thực — điều hướng ngay, không render
+                // nội dung trang (tránh lộ dữ liệu trong 1 khoảnh khắc trước khi redirect).
+            }
+        </Found>
+    </Router>
+}
 
 @code {
-    protected override void OnInitialized()
+    // Gọi AuthState.InitializeAsync() (đọc localStorage qua JS interop) ở đây thay
+    // vì trong Program.cs trước host.RunAsync() — JS interop chưa sẵn sàng tại thời
+    // điểm đó trong WASM, gọi sớm quá gây lỗi ngầm ngay lúc app vừa load. Không render
+    // Router cho tới khi biết chắc trạng thái đăng nhập, tránh nhấp nháy sai route.
+    private bool initialized;
+
+    protected override async Task OnInitializedAsync()
     {
-        Nav.LocationChanged += (_, _) => RedirectIfNeeded();
+        Nav.LocationChanged += OnLocationChanged;
+        await Auth.InitializeAsync();
+        initialized = true;
+        RedirectIfNeeded();
     }
 
-    protected override void OnAfterRender(bool firstRender)
-    {
-        if (firstRender) RedirectIfNeeded();
-    }
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e) =>
+        RedirectIfNeeded();
 
     private static bool IsPublicRoute(Microsoft.AspNetCore.Components.RouteData routeData) =>
         routeData.PageType == typeof(Pages.DangNhap) || routeData.PageType == typeof(Pages.NotFound);
@@ -38,5 +49,10 @@
 
         if (!Auth.IsAuthenticated && !isLoginPage)
             Nav.NavigateTo("/dang-nhap");
+    }
+
+    public void Dispose()
+    {
+        Nav.LocationChanged -= OnLocationChanged;
     }
 }
