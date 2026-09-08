@@ -11,7 +11,7 @@ namespace DmsBlazor.Api.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Authorize(Roles = nameof(UserRole.Admin))]
-public class UsersController(DmsDbContext db) : ControllerBase
+public class UsersController(DmsDbContext db, AuditLogger audit) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<List<User>>> GetAll() =>
@@ -38,6 +38,7 @@ public class UsersController(DmsDbContext db) : ControllerBase
 
         db.Users.Add(user);
         await db.SaveChangesAsync();
+        await audit.LogAsync(User, "Create", "User", user.Id.ToString(), $"Tạo tài khoản '{user.Username}' vai trò {user.Role}");
         return CreatedAtAction(nameof(GetAll), user);
     }
 
@@ -47,15 +48,18 @@ public class UsersController(DmsDbContext db) : ControllerBase
         var user = await db.Users.FindAsync(id);
         if (user is null) return NotFound();
 
+        var passwordChanged = !string.IsNullOrWhiteSpace(request.Password);
         user.DisplayName = request.DisplayName.Trim();
         user.Role = request.Role;
         user.IsActive = request.IsActive;
         user.LinkedSalesRepId = request.LinkedSalesRepId;
         user.LinkedDriverId = request.LinkedDriverId;
-        if (!string.IsNullOrWhiteSpace(request.Password))
-            user.PasswordHash = PasswordHasher.Hash(request.Password);
+        if (passwordChanged)
+            user.PasswordHash = PasswordHasher.Hash(request.Password!);
 
         await db.SaveChangesAsync();
+        await audit.LogAsync(User, "Update", "User", user.Id.ToString(),
+            $"Sửa tài khoản '{user.Username}' — vai trò {user.Role}, {(user.IsActive ? "hoạt động" : "đã khoá")}{(passwordChanged ? ", đổi mật khẩu" : "")}");
         return NoContent();
     }
 
@@ -67,6 +71,7 @@ public class UsersController(DmsDbContext db) : ControllerBase
 
         db.Users.Remove(user);
         await db.SaveChangesAsync();
+        await audit.LogAsync(User, "Delete", "User", id.ToString(), $"Xoá tài khoản '{user.Username}'");
         return NoContent();
     }
 }

@@ -48,6 +48,7 @@ var jwtSecret = builder.Configuration["Jwt:Secret"]
         "dài, tối thiểu 32 ký tự>\"'. Render: thêm biến môi trường Jwt__Secret.");
 
 builder.Services.AddSingleton<JwtTokenService>();
+builder.Services.AddScoped<AuditLogger>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {

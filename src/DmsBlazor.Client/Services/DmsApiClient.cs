@@ -39,6 +39,11 @@ public class DmsApiClient(HttpClient http)
         return (false, await res.Content.ReadAsStringAsync());
     }
 
+    public Task<List<AuditLog>?> GetAuditLogsAsync(string? entityType = null) =>
+        http.GetFromJsonAsync<List<AuditLog>>(string.IsNullOrWhiteSpace(entityType)
+            ? "api/auditlogs"
+            : $"api/auditlogs?entityType={Uri.EscapeDataString(entityType)}");
+
     public async Task<bool> DeleteUserAsync(int id)
     {
         var res = await http.DeleteAsync($"api/users/{id}");

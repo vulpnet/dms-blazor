@@ -22,6 +22,7 @@ public class DmsDbContext(DbContextOptions<DmsDbContext> options) : DbContext(op
     public DbSet<InventoryTransaction> InventoryTransactions => Set<InventoryTransaction>();
     public DbSet<DistributorPayment> DistributorPayments => Set<DistributorPayment>();
     public DbSet<User> Users => Set<User>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -194,6 +195,19 @@ public class DmsDbContext(DbContextOptions<DmsDbContext> options) : DbContext(op
             e.Property(x => x.PasswordHash).HasMaxLength(200).IsRequired();
             e.Property(x => x.DisplayName).HasMaxLength(200).IsRequired();
             e.Property(x => x.IsActive).HasDefaultValue(true);
+        });
+
+        modelBuilder.Entity<AuditLog>(e =>
+        {
+            e.ToTable("audit_logs");
+            e.Property(x => x.ActorUsername).HasMaxLength(50).IsRequired();
+            e.Property(x => x.Action).HasMaxLength(50).IsRequired();
+            e.Property(x => x.EntityType).HasMaxLength(50).IsRequired();
+            e.Property(x => x.EntityId).HasMaxLength(50);
+            e.Property(x => x.Detail).HasMaxLength(1000);
+            // Truy vấn phổ biến nhất: xem log gần đây theo loại thực thể — index
+            // giúp tránh full scan khi bảng lớn dần theo thời gian.
+            e.HasIndex(x => new { x.EntityType, x.CreatedAt });
         });
     }
 }

@@ -10,7 +10,7 @@ namespace DmsBlazor.Api.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Authorize(Roles = nameof(UserRole.Admin))]
-public class CustomersController(DmsDbContext db) : ControllerBase
+public class CustomersController(DmsDbContext db, AuditLogger audit) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<List<Customer>>> GetAll() =>
@@ -32,6 +32,7 @@ public class CustomersController(DmsDbContext db) : ControllerBase
         input.Id = 0;
         db.Customers.Add(input);
         await db.SaveChangesAsync();
+        await audit.LogAsync(User, "Create", "Customer", input.Id.ToString(), $"Tạo khách hàng '{input.Name}'");
         return CreatedAtAction(nameof(GetById), new { id = input.Id }, input);
     }
 
@@ -47,6 +48,7 @@ public class CustomersController(DmsDbContext db) : ControllerBase
         customer.IsActive = input.IsActive;
 
         await db.SaveChangesAsync();
+        await audit.LogAsync(User, "Update", "Customer", id.ToString(), $"Sửa khách hàng '{customer.Name}'");
         return NoContent();
     }
 
@@ -58,6 +60,7 @@ public class CustomersController(DmsDbContext db) : ControllerBase
 
         db.Customers.Remove(customer);
         await db.SaveChangesAsync();
+        await audit.LogAsync(User, "Delete", "Customer", id.ToString(), $"Xoá khách hàng '{customer.Name}'");
         return NoContent();
     }
 }

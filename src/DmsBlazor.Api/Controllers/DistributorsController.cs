@@ -10,7 +10,7 @@ namespace DmsBlazor.Api.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Authorize(Roles = nameof(UserRole.Admin))]
-public class DistributorsController(DmsDbContext db) : ControllerBase
+public class DistributorsController(DmsDbContext db, AuditLogger audit) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<List<Distributor>>> GetAll() =>
@@ -32,6 +32,7 @@ public class DistributorsController(DmsDbContext db) : ControllerBase
         input.Id = 0;
         db.Distributors.Add(input);
         await db.SaveChangesAsync();
+        await audit.LogAsync(User, "Create", "Distributor", input.Id.ToString(), $"Tạo nhà phân phối '{input.Name}'");
         return CreatedAtAction(nameof(GetById), new { id = input.Id }, input);
     }
 
@@ -48,6 +49,7 @@ public class DistributorsController(DmsDbContext db) : ControllerBase
         distributor.ExtraDiscountPercent = input.ExtraDiscountPercent;
 
         await db.SaveChangesAsync();
+        await audit.LogAsync(User, "Update", "Distributor", id.ToString(), $"Sửa nhà phân phối '{distributor.Name}'");
         return NoContent();
     }
 
@@ -59,6 +61,7 @@ public class DistributorsController(DmsDbContext db) : ControllerBase
 
         db.Distributors.Remove(distributor);
         await db.SaveChangesAsync();
+        await audit.LogAsync(User, "Delete", "Distributor", id.ToString(), $"Xoá nhà phân phối '{distributor.Name}'");
         return NoContent();
     }
 }

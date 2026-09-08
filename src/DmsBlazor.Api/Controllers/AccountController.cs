@@ -11,7 +11,7 @@ namespace DmsBlazor.Api.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]
-public class AccountController(DmsDbContext db) : ControllerBase
+public class AccountController(DmsDbContext db, AuditLogger audit) : ControllerBase
 {
     [HttpPost("change-password")]
     public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
@@ -30,6 +30,7 @@ public class AccountController(DmsDbContext db) : ControllerBase
 
         user.PasswordHash = PasswordHasher.Hash(request.NewPassword);
         await db.SaveChangesAsync();
+        await audit.LogAsync(User, "ChangePassword", "User", user.Id.ToString(), "Tự đổi mật khẩu");
         return NoContent();
     }
 }

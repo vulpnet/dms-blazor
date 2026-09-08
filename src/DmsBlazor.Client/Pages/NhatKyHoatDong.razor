@@ -1,0 +1,128 @@
+@page "/nhat-ky-hoat-dong"
+@using DmsBlazor.Shared.Models
+@using DmsBlazor.Client.Services
+@using DmsBlazor.Client.Auth
+@inject DmsApiClient Api
+@inject AuthState Auth
+
+<PageTitle>Nhật ký hoạt động — DMS</PageTitle>
+
+@if (Auth.Role != UserRole.Admin)
+{
+    <p class="muted">Bạn không có quyền truy cập trang này.</p>
+}
+else
+{
+    <div class="page-header">
+        <h1>Nhật ký hoạt động</h1>
+        <p>Lịch sử các thao tác quản trị/nhạy cảm — quản lý tài khoản, thanh toán NPP, CRUD danh mục.</p>
+    </div>
+
+    @if (logs is null)
+    {
+        <div class="skeleton-row"><div class="skeleton-card"></div></div>
+    }
+    else
+    {
+        <div class="filter-bar">
+            <input class="filter-search" @bind="searchText" @bind:event="oninput" placeholder="Tìm theo người thực hiện, hành động, nội dung..." />
+            <select class="filter-select" @bind="entityTypeFilter" @bind:after="Reload">
+                <option value="">Tất cả loại</option>
+                <option value="User">Tài khoản</option>
+                <option value="DistributorPayment">Thanh toán NPP</option>
+                <option value="Product">Sản phẩm</option>
+                <option value="Customer">Khách hàng</option>
+                <option value="Distributor">Nhà phân phối</option>
+            </select>
+        </div>
+
+        @if (FilteredLogs.Count == 0)
+        {
+            <p class="muted">Không có nhật ký nào khớp bộ lọc.</p>
+        }
+        else
+        {
+            <div class="card">
+                <table class="data-table">
+                    <thead>
+                        <tr><th>Thời gian</th><th>Người thực hiện</th><th>Hành động</th><th>Loại</th><th>Nội dung</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var log in FilteredLogs)
+                        {
+                            <tr>
+                                <td>@log.CreatedAt.ToLocalTime().ToString("HH:mm dd/MM/yyyy")</td>
+                                <td>@log.ActorUsername</td>
+                                <td><span class="channel-badge @ActionBadgeClass(log.Action)">@ActionLabel(log.Action)</span></td>
+                                <td>@EntityTypeLabel(log.EntityType)</td>
+                                <td>@log.Detail</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    }
+}
+
+<style>
+    .filter-bar { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .filter-search { flex: 1; min-width: 220px; padding: 0.55rem 0.8rem; border: 1px solid var(--line-strong); border-radius: 8px; font-size: 0.88rem; }
+    .filter-select { padding: 0.55rem 0.8rem; border: 1px solid var(--line-strong); border-radius: 8px; font-size: 0.88rem; }
+    .muted { color: var(--muted); font-size: 0.85rem; }
+
+    .channel-badge { font-size: 0.75rem; font-weight: 650; padding: 0.2rem 0.55rem; border-radius: 999px; }
+    .channel-badge.create { background: var(--success-soft); color: var(--success); }
+    .channel-badge.update { background: var(--brand-soft); color: var(--brand); }
+    .channel-badge.delete { background: var(--danger-soft); color: var(--danger); }
+    .channel-badge.other { background: #eef1f5; color: #475569; }
+</style>
+
+@code {
+    private List<AuditLog>? logs;
+    private string searchText = "";
+    private string entityTypeFilter = "";
+
+    private List<AuditLog> FilteredLogs => (logs ?? [])
+        .Where(l => string.IsNullOrWhiteSpace(searchText)
+            || l.ActorUsername.Contains(searchText, StringComparison.OrdinalIgnoreCase)
+            || l.Action.Contains(searchText, StringComparison.OrdinalIgnoreCase)
+            || (l.Detail ?? "").Contains(searchText, StringComparison.OrdinalIgnoreCase))
+        .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Auth.Role != UserRole.Admin) return;
+        await Reload();
+    }
+
+    private async Task Reload() =>
+        logs = await Api.GetAuditLogsAsync(string.IsNullOrWhiteSpace(entityTypeFilter) ? null : entityTypeFilter);
+
+    private static string ActionLabel(string action) => action switch
+    {
+        "Create" => "Tạo mới",
+        "Update" => "Cập nhật",
+        "Delete" => "Xoá",
+        "ChangePassword" => "Đổi mật khẩu",
+        _ => action
+    };
+
+    private static string ActionBadgeClass(string action) => action switch
+    {
+        "Create" => "create",
+        "Update" => "update",
+        "Delete" => "delete",
+        _ => "other"
+    };
+
+    private static string EntityTypeLabel(string entityType) => entityType switch
+    {
+        "User" => "Tài khoản",
+        "DistributorPayment" => "Thanh toán NPP",
+        "Product" => "Sản phẩm",
+        "Customer" => "Khách hàng",
+        "Distributor" => "Nhà phân phối",
+        _ => entityType
+    };
+}

@@ -17,7 +17,7 @@ namespace DmsBlazor.Api.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Authorize(Roles = $"{nameof(UserRole.Admin)},{nameof(UserRole.Accountant)}")]
-public class DistributorPaymentsController(DmsDbContext db) : ControllerBase
+public class DistributorPaymentsController(DmsDbContext db, AuditLogger audit) : ControllerBase
 {
     [HttpGet("debts")]
     public async Task<ActionResult<List<DistributorDebt>>> GetDebts()
@@ -72,15 +72,18 @@ public class DistributorPaymentsController(DmsDbContext db) : ControllerBase
         var distributorExists = await db.Distributors.AnyAsync(d => d.Id == request.DistributorId);
         if (!distributorExists) return BadRequest("Không tìm thấy nhà phân phối.");
 
-        db.DistributorPayments.Add(new DistributorPayment
+        var payment = new DistributorPayment
         {
             DistributorId = request.DistributorId,
             Amount = request.Amount,
             Note = request.Note?.Trim(),
             CreatedAt = DateTimeOffset.UtcNow
-        });
+        };
+        db.DistributorPayments.Add(payment);
 
         await db.SaveChangesAsync();
+        await audit.LogAsync(User, "Create", "DistributorPayment", payment.Id.ToString(),
+            $"Ghi nhận thanh toán {payment.Amount:N0}k cho NPP id={request.DistributorId}");
         return NoContent();
     }
 }

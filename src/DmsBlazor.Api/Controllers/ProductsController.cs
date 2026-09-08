@@ -10,7 +10,7 @@ namespace DmsBlazor.Api.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Authorize(Roles = nameof(UserRole.Admin))]
-public class ProductsController(DmsDbContext db) : ControllerBase
+public class ProductsController(DmsDbContext db, AuditLogger audit) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<List<Product>>> GetAll() =>
@@ -32,6 +32,7 @@ public class ProductsController(DmsDbContext db) : ControllerBase
         input.Id = 0; // đảm bảo tạo mới, không ghi đè theo Id client gửi lên
         db.Products.Add(input);
         await db.SaveChangesAsync();
+        await audit.LogAsync(User, "Create", "Product", input.Id.ToString(), $"Tạo sản phẩm '{input.Name}' ({input.Code})");
         return CreatedAtAction(nameof(GetById), new { id = input.Id }, input);
     }
 
@@ -56,6 +57,7 @@ public class ProductsController(DmsDbContext db) : ControllerBase
         product.LowStockThreshold = input.LowStockThreshold;
 
         await db.SaveChangesAsync();
+        await audit.LogAsync(User, "Update", "Product", id.ToString(), $"Sửa sản phẩm '{product.Name}' ({product.Code})");
         return NoContent();
     }
 
@@ -67,6 +69,7 @@ public class ProductsController(DmsDbContext db) : ControllerBase
 
         db.Products.Remove(product);
         await db.SaveChangesAsync();
+        await audit.LogAsync(User, "Delete", "Product", id.ToString(), $"Xoá sản phẩm '{product.Name}' ({product.Code})");
         return NoContent();
     }
 }
