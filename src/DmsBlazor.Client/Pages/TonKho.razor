@@ -5,6 +5,7 @@
 @implements IDisposable
 @inject DmsApiClient Api
 @inject SelectedDistributorState SelectedDistributor
+@inject CsvExportService CsvExport
 
 <PageTitle>Tồn kho — DMS</PageTitle>
 
@@ -50,6 +51,10 @@ else
 
         <div class="filter-bar">
             <input class="filter-search" @bind="searchText" @bind:event="oninput" placeholder="Tìm theo mã, tên sản phẩm..." />
+            @if (stocks is { Count: > 0 })
+            {
+                <button class="btn-outline" @onclick="ExportStocksCsv">⬇ Xuất Excel</button>
+            }
         </div>
 
         @if (stocks is null)
@@ -399,6 +404,16 @@ else
         if (selectedWarehouseId == 0) return;
         stocks = await Api.GetStocksAsync(selectedWarehouseId);
     }
+
+    private Task ExportStocksCsv() => CsvExport.ExportAsync<InventoryStock>(
+        $"ton-kho-{DateTime.Now:yyyyMMdd-HHmm}.csv",
+        [
+            ("Mã sản phẩm", s => s.ProductCode),
+            ("Tên sản phẩm", s => s.ProductName),
+            ("Tồn kho", s => s.Quantity),
+            ("Đơn vị", s => s.Unit)
+        ],
+        FilteredStocks);
 
     private async Task SetTab(string tab)
     {

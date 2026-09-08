@@ -5,12 +5,19 @@
 @implements IDisposable
 @inject DmsApiClient Api
 @inject SelectedDistributorState SelectedDistributor
+@inject CsvExportService CsvExport
 
 <PageTitle>Công nợ nhà phân phối — DMS</PageTitle>
 
-<div class="page-header">
-    <h1>Công nợ nhà phân phối</h1>
-    <p>Mọi đơn hàng kênh NPP đều tự động ghi nợ — dùng "Ghi nhận thanh toán" khi NPP trả tiền để trừ công nợ.</p>
+<div class="page-header page-header-row">
+    <div>
+        <h1>Công nợ nhà phân phối</h1>
+        <p>Mọi đơn hàng kênh NPP đều tự động ghi nợ — dùng "Ghi nhận thanh toán" khi NPP trả tiền để trừ công nợ.</p>
+    </div>
+    @if (debts is { Count: > 0 })
+    {
+        <button class="btn-outline" @onclick="ExportCsv">⬇ Xuất Excel</button>
+    }
 </div>
 
 @if (debts is null)
@@ -167,6 +174,7 @@ else
     .field { margin-bottom: 1rem; }
     .field label { display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 0.4rem; }
     .field input { width: 100%; padding: 0.55rem 0.7rem; border: 1px solid var(--line-strong); border-radius: 8px; font-size: 0.88rem; box-sizing: border-box; }
+    .page-header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
     .btn-outline {
         border: 1px solid var(--line-strong); color: var(--ink); background: var(--surface);
         padding: 0.55rem 1rem; border-radius: 8px; font-weight: 600; font-size: 0.85rem; cursor: pointer;
@@ -198,6 +206,20 @@ else
         .Where(d => string.IsNullOrWhiteSpace(searchText) || d.DistributorName.Contains(searchText, StringComparison.OrdinalIgnoreCase))
         .Where(d => !onlyOverLimit || d.OverLimit)
         .ToList();
+
+    // Xuất đúng danh sách đã lọc (không phải toàn bộ) — người dùng lọc trước khi
+    // xuất là ý định rõ ràng, xuất khác với những gì đang xem trên màn hình sẽ gây nhầm lẫn.
+    private Task ExportCsv() => CsvExport.ExportAsync<DistributorDebt>(
+        $"cong-no-{DateTime.Now:yyyyMMdd-HHmm}.csv",
+        [
+            ("Nhà phân phối", d => d.DistributorName),
+            ("Hạn mức", d => d.CreditLimit),
+            ("Tổng đã đặt", d => d.TotalOrdered),
+            ("Đã thanh toán", d => d.TotalPaid),
+            ("Công nợ hiện tại", d => d.CurrentDebt),
+            ("Vượt hạn mức", d => d.OverLimit ? "Có" : "")
+        ],
+        FilteredDebts);
 
     protected override async Task OnInitializedAsync()
     {

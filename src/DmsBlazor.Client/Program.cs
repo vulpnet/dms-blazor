@@ -28,6 +28,7 @@ builder.Services.AddScoped(sp =>
     return new HttpClient(handler) { BaseAddress = new Uri(apiBaseUrl) };
 });
 builder.Services.AddScoped<DmsApiClient>();
+builder.Services.AddScoped<CsvExportService>();
 
 var host = builder.Build();
 await host.RunAsync();
