@@ -6,7 +6,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace DmsBlazor.Api.Controllers;
 
-/// <summary>Quản lý tài khoản đăng nhập — chỉ Admin được thao tác.</summary>
+/// <summary>Quản lý tài khoản đăng nhập — chỉ Admin được thao tác. Tự đổi mật khẩu
+/// của chính mình nằm ở AccountController (không giới hạn role Admin).</summary>
 [ApiController]
 [Route("api/[controller]")]
 [Authorize(Roles = nameof(UserRole.Admin))]

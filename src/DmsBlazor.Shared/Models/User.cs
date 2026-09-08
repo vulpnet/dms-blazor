@@ -61,3 +61,11 @@ public class UpdateUserRequest
     public int? LinkedDriverId { get; set; }
     public string? Password { get; set; }
 }
+
+/// <summary>Tự đổi mật khẩu của chính mình — khác UpdateUserRequest (Admin đổi hộ
+/// người khác, không cần biết mật khẩu cũ) vì bắt buộc xác nhận CurrentPassword.</summary>
+public class ChangePasswordRequest
+{
+    public string CurrentPassword { get; set; } = "";
+    public string NewPassword { get; set; } = "";
+}

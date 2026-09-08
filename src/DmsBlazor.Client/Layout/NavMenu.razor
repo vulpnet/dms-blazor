@@ -52,10 +52,10 @@
     @if (Auth.IsAuthenticated)
     {
         <div class="user-row">
-            <div class="user-info">
+            <a class="user-info" href="doi-mat-khau" title="Đổi mật khẩu">
                 <div class="user-name">@Auth.DisplayName</div>
                 <div class="user-role">@RoleLabel(Auth.Role)</div>
-            </div>
+            </a>
             <button class="btn-logout" title="Đăng xuất" @onclick="Logout">⏻</button>
         </div>
     }

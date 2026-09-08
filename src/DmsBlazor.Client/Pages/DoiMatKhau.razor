@@ -1,0 +1,105 @@
+@page "/doi-mat-khau"
+@using DmsBlazor.Shared.Models
+@using DmsBlazor.Client.Services
+@inject DmsApiClient Api
+
+<PageTitle>Đổi mật khẩu — DMS</PageTitle>
+
+<div class="page-header">
+    <h1>Đổi mật khẩu</h1>
+    <p>Đổi mật khẩu đăng nhập của chính bạn.</p>
+</div>
+
+<div class="card form-card">
+    <div class="field">
+        <label for="current-password">Mật khẩu hiện tại</label>
+        <input id="current-password" type="password" @bind="currentPassword" />
+    </div>
+    <div class="field">
+        <label for="new-password">Mật khẩu mới</label>
+        <input id="new-password" type="password" @bind="newPassword" />
+    </div>
+    <div class="field">
+        <label for="confirm-password">Nhập lại mật khẩu mới</label>
+        <input id="confirm-password" type="password" @bind="confirmPassword" />
+    </div>
+
+    @if (error is not null)
+    {
+        <div class="alert-error">@error</div>
+    }
+    @if (success)
+    {
+        <div class="alert-success">Đổi mật khẩu thành công.</div>
+    }
+
+    <button class="btn-primary" disabled="@saving" @onclick="Submit">
+        @(saving ? "Đang lưu..." : "Đổi mật khẩu")
+    </button>
+</div>
+
+<style>
+    .form-card { max-width: 420px; }
+    .field { margin-bottom: 1rem; }
+    .field label { display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 0.4rem; }
+    .field input { width: 100%; padding: 0.55rem 0.7rem; border: 1px solid var(--line-strong); border-radius: 8px; font-size: 0.88rem; box-sizing: border-box; }
+    .btn-primary {
+        background: var(--brand); color: #fff; border: none; border-radius: 8px;
+        padding: 0.6rem 1.2rem; font-weight: 600; cursor: pointer; font-size: 0.85rem;
+    }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+    .alert-success {
+        background: var(--success-soft); color: var(--success);
+        padding: 0.6rem 0.8rem; border-radius: 8px; font-size: 0.83rem; margin-bottom: 1rem;
+    }
+</style>
+
+@code {
+    private string currentPassword = "";
+    private string newPassword = "";
+    private string confirmPassword = "";
+    private string? error;
+    private bool success;
+    private bool saving;
+
+    private async Task Submit()
+    {
+        error = null;
+        success = false;
+
+        if (string.IsNullOrWhiteSpace(currentPassword) || string.IsNullOrWhiteSpace(newPassword))
+        {
+            error = "Vui lòng nhập đầy đủ mật khẩu hiện tại và mật khẩu mới.";
+            return;
+        }
+        if (newPassword.Length < 6)
+        {
+            error = "Mật khẩu mới phải có ít nhất 6 ký tự.";
+            return;
+        }
+        if (newPassword != confirmPassword)
+        {
+            error = "Mật khẩu mới nhập lại không khớp.";
+            return;
+        }
+
+        saving = true;
+        var (ok, err) = await Api.ChangePasswordAsync(new ChangePasswordRequest
+        {
+            CurrentPassword = currentPassword,
+            NewPassword = newPassword
+        });
+        saving = false;
+
+        if (!ok)
+        {
+            error = err ?? "Không thể đổi mật khẩu.";
+            return;
+        }
+
+        success = true;
+        currentPassword = "";
+        newPassword = "";
+        confirmPassword = "";
+    }
+}

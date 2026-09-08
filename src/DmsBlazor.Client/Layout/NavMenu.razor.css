@@ -147,6 +147,16 @@
 
 .user-info {
     min-width: 0;
+    text-decoration: none;
+    color: inherit;
+    display: block;
+    border-radius: 6px;
+    padding: 0.15rem 0.3rem;
+    margin: -0.15rem -0.3rem;
+}
+
+.user-info:hover {
+    background: var(--canvas, #f4f6f9);
 }
 
 .user-name {

@@ -15,6 +15,13 @@ public class DmsApiClient(HttpClient http)
         return (await res.Content.ReadFromJsonAsync<LoginResponse>(), null);
     }
 
+    public async Task<(bool Success, string? Error)> ChangePasswordAsync(ChangePasswordRequest request)
+    {
+        var res = await http.PostAsJsonAsync("api/account/change-password", request);
+        if (res.IsSuccessStatusCode) return (true, null);
+        return (false, await res.Content.ReadAsStringAsync());
+    }
+
     public Task<List<User>?> GetUsersAsync() =>
         http.GetFromJsonAsync<List<User>>("api/users");
 
