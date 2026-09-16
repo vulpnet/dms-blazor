@@ -8,6 +8,11 @@ public class Distributor
     public bool IsActive { get; set; } = true;
     public decimal CreditLimit { get; set; } // hạn mức công nợ tối đa (nghìn đồng), 0 = không giới hạn
     public decimal ExtraDiscountPercent { get; set; } // chiết khấu riêng theo hợp đồng, cộng thêm vào chiết khấu bậc thang chung
+
+    // Mặc định false — đơn vượt hạn mức vẫn đặt được, chỉ cảnh báo (tránh gián đoạn
+    // kinh doanh với NPP thân thiết cần mua thêm dù đang nợ). Admin bật cờ này cho
+    // từng NPP rủi ro cao để chặn cứng không cho đặt thêm khi đã vượt hạn mức.
+    public bool BlockOverCreditLimit { get; set; }
 }
 
 /// <summary>Ghi nhận 1 lần NPP thanh toán — trừ vào công nợ hiện tại. Công nợ hiện

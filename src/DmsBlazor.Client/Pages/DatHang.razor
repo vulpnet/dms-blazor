@@ -146,6 +146,14 @@ else
                     <div class="row total"><span>Thành tiền</span><span>@priced.Total.ToString("N0")k</span></div>
                 </div>
 
+                @if (priced.DistributorOverLimit)
+                {
+                    <div class="alert-warning">
+                        ⚠️ Nhà phân phối này đang nợ <b>@priced.DistributorCurrentDebt?.ToString("N0")k</b>,
+                        cộng đơn này sẽ vượt hạn mức <b>@priced.DistributorCreditLimit?.ToString("N0")k</b>.
+                    </div>
+                }
+
                 @if (confirmError is not null)
                 {
                     <div class="alert-error">@confirmError</div>

@@ -34,6 +34,7 @@ public class DmsDbContext(DbContextOptions<DmsDbContext> options) : DbContext(op
             e.Property(x => x.Region).HasMaxLength(100).IsRequired();
             e.Property(x => x.IsActive).HasDefaultValue(true);
             e.Property(x => x.CreditLimit).HasPrecision(14, 2);
+            e.Property(x => x.BlockOverCreditLimit).HasDefaultValue(false);
         });
 
         modelBuilder.Entity<DistributorPayment>(e =>

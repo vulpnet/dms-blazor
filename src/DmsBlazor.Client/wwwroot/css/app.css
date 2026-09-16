@@ -320,6 +320,16 @@ code {
     margin-bottom: 1rem;
 }
 
+.alert-warning {
+    background: var(--warning-soft);
+    color: var(--warning);
+    border: 1px solid #f5dca0;
+    border-radius: 8px;
+    padding: 0.7rem 1rem;
+    font-size: 0.85rem;
+    margin-bottom: 1rem;
+}
+
 /* Toggle switch — bật/tắt "Đang bán" ngay trong bảng, không cần mở form */
 .toggle { display: inline-flex; cursor: pointer; }
 .toggle input { position: absolute; opacity: 0; width: 0; height: 0; }

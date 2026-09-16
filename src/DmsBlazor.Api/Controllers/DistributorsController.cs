@@ -62,6 +62,7 @@ public class DistributorsController(DmsDbContext db, AuditLogger audit) : Contro
         distributor.IsActive = input.IsActive;
         distributor.CreditLimit = input.CreditLimit;
         distributor.ExtraDiscountPercent = input.ExtraDiscountPercent;
+        distributor.BlockOverCreditLimit = input.BlockOverCreditLimit;
 
         await db.SaveChangesAsync();
         await audit.LogAsync(User, "Update", "Distributor", id.ToString(),

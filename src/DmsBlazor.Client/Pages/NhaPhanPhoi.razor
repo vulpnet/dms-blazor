@@ -114,6 +114,16 @@ else
                     </label>
                 </div>
 
+                @if (formModel.CreditLimit > 0)
+                {
+                    <div class="field field-checkbox">
+                        <label>
+                            <InputCheckbox @bind-Value="formModel.BlockOverCreditLimit" />
+                            Chặn không cho đặt đơn mới khi đã vượt hạn mức công nợ
+                        </label>
+                    </div>
+                }
+
                 @if (formError is not null)
                 {
                     <div class="alert-error">@formError</div>
@@ -305,7 +315,8 @@ else
             Region = d.Region,
             IsActive = d.IsActive,
             CreditLimit = d.CreditLimit,
-            ExtraDiscountPercent = d.ExtraDiscountPercent
+            ExtraDiscountPercent = d.ExtraDiscountPercent,
+            BlockOverCreditLimit = d.BlockOverCreditLimit
         };
         formError = null;
         showForm = true;
@@ -324,7 +335,8 @@ else
             Region = formModel.Region.Trim(),
             IsActive = formModel.IsActive,
             CreditLimit = formModel.CreditLimit,
-            ExtraDiscountPercent = formModel.ExtraDiscountPercent
+            ExtraDiscountPercent = formModel.ExtraDiscountPercent,
+            BlockOverCreditLimit = formModel.CreditLimit > 0 && formModel.BlockOverCreditLimit
         };
 
         var (success, error) = editingId is null
@@ -352,7 +364,8 @@ else
             Region = d.Region,
             IsActive = isActive,
             CreditLimit = d.CreditLimit,
-            ExtraDiscountPercent = d.ExtraDiscountPercent
+            ExtraDiscountPercent = d.ExtraDiscountPercent,
+            BlockOverCreditLimit = d.BlockOverCreditLimit
         };
         var (success, _) = await Api.UpdateDistributorAsync(d.Id, updated);
         if (!success) await LoadDistributors();
@@ -390,5 +403,7 @@ else
 
         [Range(0, 100, ErrorMessage = "Chiết khấu phải từ 0 đến 100")]
         public decimal ExtraDiscountPercent { get; set; }
+
+        public bool BlockOverCreditLimit { get; set; }
     }
 }

@@ -10,7 +10,7 @@ namespace DmsBlazor.Api.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Authorize(Roles = $"{nameof(UserRole.Admin)},{nameof(UserRole.SalesRep)}")]
-public class OrdersController(DmsDbContext db) : ControllerBase
+public class OrdersController(DmsDbContext db, AuditLogger audit) : ControllerBase
 {
     // Tính giá + khuyến mãi cho giỏ hàng hiện tại — gọi mỗi khi khách đổi số lượng,
     // không lưu gì cả, chỉ trả lại kết quả tính toán để hiển thị trực tiếp.
@@ -18,19 +18,36 @@ public class OrdersController(DmsDbContext db) : ControllerBase
     public async Task<ActionResult<PricedOrder>> Price([FromBody] CreateOrderRequest request)
     {
         var products = await db.Products.Where(p => p.IsActive).ToListAsync();
-        var extraDiscount = await GetExtraDiscountAsync(request);
-        var priced = OrderPricingService.Price(request.Lines, products, request.Channel, extraDiscount);
+        var distributor = await GetDistributorAsync(request);
+        var priced = OrderPricingService.Price(request.Lines, products, request.Channel, distributor?.ExtraDiscountPercent ?? 0);
+        await AttachDebtWarningAsync(priced, distributor);
         return priced;
     }
 
-    // Chiết khấu riêng theo hợp đồng NPP — chỉ áp dụng kênh Npp và khi có DistributorId.
-    private async Task<decimal> GetExtraDiscountAsync(CreateOrderRequest request)
+    private async Task<Distributor?> GetDistributorAsync(CreateOrderRequest request)
     {
-        if (request.Channel != SalesChannel.Npp || !request.DistributorId.HasValue) return 0;
-        return await db.Distributors
-            .Where(d => d.Id == request.DistributorId.Value)
-            .Select(d => d.ExtraDiscountPercent)
-            .FirstOrDefaultAsync();
+        if (request.Channel != SalesChannel.Npp || !request.DistributorId.HasValue) return null;
+        return await db.Distributors.FindAsync(request.DistributorId.Value);
+    }
+
+    // Cảnh báo công nợ TRƯỚC khi xác nhận — tính công nợ hiện tại (chưa tính đơn
+    // đang lên giá) rồi cộng thêm Total của đơn này để biết có vượt hạn mức không,
+    // giúp NVBH thấy cảnh báo ngay khi đang chọn hàng thay vì chỉ biết sau khi đặt.
+    private async Task AttachDebtWarningAsync(PricedOrder priced, Distributor? distributor)
+    {
+        if (distributor is null || distributor.CreditLimit <= 0) return;
+
+        var totalOrdered = await db.Orders
+            .Where(o => o.Channel == SalesChannel.Npp && o.Status == OrderStatus.Confirmed && o.DistributorId == distributor.Id)
+            .SumAsync(o => o.Total);
+        var totalPaid = await db.DistributorPayments
+            .Where(p => p.DistributorId == distributor.Id)
+            .SumAsync(p => p.Amount);
+        var currentDebt = totalOrdered - totalPaid;
+
+        priced.DistributorCurrentDebt = currentDebt;
+        priced.DistributorCreditLimit = distributor.CreditLimit;
+        priced.DistributorOverLimit = currentDebt + priced.Total > distributor.CreditLimit;
     }
 
     // Xác nhận đặt hàng — lưu thật vào database, sinh mã đơn tăng dần (DH-2026-0001).
@@ -38,20 +55,34 @@ public class OrdersController(DmsDbContext db) : ControllerBase
     public async Task<ActionResult<Order>> Confirm([FromBody] CreateOrderRequest request)
     {
         var products = await db.Products.Where(p => p.IsActive).ToListAsync();
-        var extraDiscount = await GetExtraDiscountAsync(request);
-        var priced = OrderPricingService.Price(request.Lines, products, request.Channel, extraDiscount);
+        var distributor = await GetDistributorAsync(request);
+        var priced = OrderPricingService.Price(request.Lines, products, request.Channel, distributor?.ExtraDiscountPercent ?? 0);
 
         if (priced.Lines.Count == 0)
             return BadRequest("Đơn hàng không có sản phẩm nào.");
 
-        string? distributorName = null;
-        if (request.Channel == SalesChannel.Npp && request.DistributorId.HasValue)
+        // Chặn cứng chỉ áp dụng khi Admin đã bật cờ BlockOverCreditLimit cho NPP này.
+        // Đây là kiểm tra "đọc rồi quyết định" (không atomic) — 2 đơn xác nhận gần
+        // như cùng lúc cho cùng 1 NPP hiếm gặp có thể cả 2 đều pass dù cộng lại vượt
+        // hạn mức; chấp nhận được vì đây là chặn mềm cảnh báo rủi ro công nợ, không
+        // phải giao dịch tiền thật cần tuyệt đối chính xác như trừ tồn kho.
+        if (distributor is not null)
         {
-            distributorName = await db.Distributors
-                .Where(d => d.Id == request.DistributorId.Value)
-                .Select(d => d.Name)
-                .FirstOrDefaultAsync();
+            await AttachDebtWarningAsync(priced, distributor);
+            if (distributor.BlockOverCreditLimit && priced.DistributorOverLimit)
+            {
+                await audit.LogAsync(User, "Blocked", "Order",
+                    detail: $"Chặn đặt đơn NPP '{distributor.Name}' — công nợ {priced.DistributorCurrentDebt:N0}k + đơn mới {priced.Total:N0}k vượt hạn mức {distributor.CreditLimit:N0}k");
+                return Conflict($"Nhà phân phối '{distributor.Name}' đã vượt hạn mức công nợ, không thể đặt thêm đơn. Liên hệ Kế toán để xử lý.");
+            }
+            if (priced.DistributorOverLimit)
+            {
+                await audit.LogAsync(User, "OverLimit", "Order",
+                    detail: $"Đơn NPP '{distributor.Name}' vượt hạn mức công nợ — nợ hiện tại {priced.DistributorCurrentDebt:N0}k + đơn mới {priced.Total:N0}k > hạn mức {distributor.CreditLimit:N0}k");
+            }
         }
+
+        var distributorName = distributor?.Name;
 
         string? customerName = null;
         string? customerPhone = null;

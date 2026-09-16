@@ -39,6 +39,13 @@ public class PricedOrder
     public decimal Total { get; set; }
     public string? AppliedTier { get; set; } // "tier1" | "tier2" | null
     public bool ComboBonusApplied { get; set; }
+
+    // Chỉ tính cho kênh NPP có DistributorId — null nghĩa là không áp dụng (Retail,
+    // hoặc NPP không có hạn mức). OverLimit = true khi (CurrentDebt + Total của đơn
+    // đang lên giá) > CreditLimit, tính TRƯỚC khi xác nhận để cảnh báo kịp thời.
+    public decimal? DistributorCurrentDebt { get; set; }
+    public decimal? DistributorCreditLimit { get; set; }
+    public bool DistributorOverLimit { get; set; }
 }
 
 public class OrderConfirmation
