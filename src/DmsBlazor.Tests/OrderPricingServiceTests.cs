@@ -87,4 +87,56 @@ public class OrderPricingServiceTests
         Assert.Equal(0m, result.DiscountPercent);
         Assert.Equal(40m, result.Total);
     }
+
+    [Fact]
+    public void CoActiveRules_GhiDeMucMacDinh_KhongDungHangSoCu()
+    {
+        // Rule cấu hình: chỉ cần >=20 là giảm 15% — khác hẳn mặc định (>=50 mới giảm 5%).
+        var rules = new List<PromotionRule>
+        {
+            new() { Id = 1, Type = PromotionRuleType.QuantityTier, Threshold = 20, DiscountPercent = 15, IsActive = true }
+        };
+
+        var result = OrderPricingService.Price(
+            [new OrderLineInput { ProductId = 1, Qty = 20 }], Catalog, SalesChannel.Npp, activeRules: rules);
+
+        Assert.Equal(20, result.TotalQty);
+        Assert.Equal(3360m, result.Subtotal);
+        Assert.Equal(15m, result.DiscountPercent);
+        Assert.Equal("rule-1", result.AppliedTier);
+    }
+
+    [Fact]
+    public void CoActiveRules_ApDungMucCaoNhatDatDuoc_KhongCongDon()
+    {
+        var rules = new List<PromotionRule>
+        {
+            new() { Id = 1, Type = PromotionRuleType.QuantityTier, Threshold = 20, DiscountPercent = 10, IsActive = true },
+            new() { Id = 2, Type = PromotionRuleType.QuantityTier, Threshold = 40, DiscountPercent = 20, IsActive = true }
+        };
+
+        var result = OrderPricingService.Price(
+            [new OrderLineInput { ProductId = 1, Qty = 45 }], Catalog, SalesChannel.Npp, activeRules: rules);
+
+        Assert.Equal(20m, result.DiscountPercent);
+        Assert.Equal("rule-2", result.AppliedTier);
+    }
+
+    [Fact]
+    public void ComboRuleCauHinh_GhiDeMucMacDinh()
+    {
+        var rules = new List<PromotionRule>
+        {
+            new() { Id = 3, Type = PromotionRuleType.ComboBonus, MinQtyPerProduct = 10, FreeUnitsPerProduct = 3, IsActive = true }
+        };
+
+        var result = OrderPricingService.Price(
+            [
+                new OrderLineInput { ProductId = 1, Qty = 10 },
+                new OrderLineInput { ProductId = 2, Qty = 10 },
+            ], Catalog, SalesChannel.Npp, activeRules: rules);
+
+        Assert.True(result.ComboBonusApplied);
+        Assert.All(result.Lines, l => Assert.Equal(3, l.FreeUnits));
+    }
 }

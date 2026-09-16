@@ -24,6 +24,7 @@ public class DmsDbContext(DbContextOptions<DmsDbContext> options) : DbContext(op
     public DbSet<User> Users => Set<User>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<DistributorDiscountHistory> DistributorDiscountHistories => Set<DistributorDiscountHistory>();
+    public DbSet<PromotionRule> PromotionRules => Set<PromotionRule>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -220,6 +221,14 @@ public class DmsDbContext(DbContextOptions<DmsDbContext> options) : DbContext(op
             e.Property(x => x.OldPercent).HasPrecision(5, 2);
             e.Property(x => x.NewPercent).HasPrecision(5, 2);
             e.HasIndex(x => new { x.DistributorId, x.ChangedAt });
+        });
+
+        modelBuilder.Entity<PromotionRule>(e =>
+        {
+            e.ToTable("promotion_rules");
+            e.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            e.Property(x => x.DiscountPercent).HasPrecision(5, 2);
+            e.Property(x => x.IsActive).HasDefaultValue(true);
         });
     }
 }

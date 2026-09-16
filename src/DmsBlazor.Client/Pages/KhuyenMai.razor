@@ -1,0 +1,313 @@
+@page "/khuyen-mai"
+@using System.ComponentModel.DataAnnotations
+@using DmsBlazor.Shared.Models
+@using DmsBlazor.Client.Services
+@using DmsBlazor.Client.Auth
+@inject DmsApiClient Api
+@inject AuthState Auth
+
+<PageTitle>Khuyến mãi — DMS</PageTitle>
+
+@if (Auth.Role != UserRole.Admin)
+{
+    <p class="muted">Bạn không có quyền truy cập trang này.</p>
+}
+else
+{
+    <div class="page-header page-header-row">
+        <div>
+            <h1>Khuyến mãi</h1>
+            <p>Cấu hình chiết khấu bậc thang và tặng kèm — không có rule nào đang hiệu lực thì hệ thống tự dùng mức mặc định (≥50 giảm 5%, ≥100 giảm 10%, combo ≥2 sản phẩm mỗi loại ≥20 tặng 1).</p>
+        </div>
+        <button class="btn-primary" @onclick="OpenCreateForm">+ Thêm khuyến mãi</button>
+    </div>
+
+    @if (errorMessage is not null)
+    {
+        <div class="alert-error">@errorMessage</div>
+    }
+
+    @if (showForm)
+    {
+        <div class="card form-card">
+            <h3>@(editingId is null ? "Thêm khuyến mãi" : "Sửa khuyến mãi")</h3>
+
+            <EditForm Model="formModel" OnValidSubmit="SaveRule">
+                <DataAnnotationsValidator />
+
+                <div class="field">
+                    <label for="f-name">Tên khuyến mãi</label>
+                    <InputText id="f-name" @bind-Value="formModel.Name" placeholder="vd: Khuyến mãi Tết 2027" />
+                </div>
+
+                <div class="field">
+                    <label for="f-type">Loại</label>
+                    <InputSelect id="f-type" @bind-Value="formModel.Type">
+                        <option value="@PromotionRuleType.QuantityTier">Chiết khấu bậc thang (theo tổng số lượng)</option>
+                        <option value="@PromotionRuleType.ComboBonus">Tặng kèm combo (theo từng sản phẩm)</option>
+                    </InputSelect>
+                </div>
+
+                @if (formModel.Type == PromotionRuleType.QuantityTier)
+                {
+                    <div class="field-row">
+                        <div class="field">
+                            <label for="f-threshold">Ngưỡng tổng số lượng</label>
+                            <InputNumber id="f-threshold" @bind-Value="formModel.Threshold" />
+                        </div>
+                        <div class="field">
+                            <label for="f-discount">Chiết khấu (%)</label>
+                            <InputNumber id="f-discount" @bind-Value="formModel.DiscountPercent" />
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="field-row">
+                        <div class="field">
+                            <label for="f-minqty">Ngưỡng mỗi sản phẩm</label>
+                            <InputNumber id="f-minqty" @bind-Value="formModel.MinQtyPerProduct" />
+                        </div>
+                        <div class="field">
+                            <label for="f-freeunits">Tặng kèm/sản phẩm</label>
+                            <InputNumber id="f-freeunits" @bind-Value="formModel.FreeUnitsPerProduct" />
+                        </div>
+                    </div>
+                }
+
+                <div class="field-row">
+                    <div class="field">
+                        <label for="f-from">Bắt đầu hiệu lực (bỏ trống = ngay)</label>
+                        <InputDate id="f-from" @bind-Value="formModel.EffectiveFrom" />
+                    </div>
+                    <div class="field">
+                        <label for="f-to">Kết thúc hiệu lực (bỏ trống = vô hạn)</label>
+                        <InputDate id="f-to" @bind-Value="formModel.EffectiveTo" />
+                    </div>
+                </div>
+
+                <div class="field field-checkbox">
+                    <label>
+                        <InputCheckbox @bind-Value="formModel.IsActive" />
+                        Đang bật
+                    </label>
+                </div>
+
+                @if (formError is not null)
+                {
+                    <div class="alert-error">@formError</div>
+                }
+
+                <div class="modal-actions">
+                    <button type="button" class="btn-outline" @onclick="CloseForm">Huỷ</button>
+                    <button type="submit" class="btn-primary" disabled="@saving">@(saving ? "Đang lưu..." : "Lưu")</button>
+                </div>
+            </EditForm>
+        </div>
+    }
+
+    @if (rules is null)
+    {
+        <div class="skeleton-row"><div class="skeleton-card"></div></div>
+    }
+    else if (rules.Count == 0)
+    {
+        <p class="muted">Chưa có khuyến mãi nào cấu hình — đang dùng mức mặc định.</p>
+    }
+    else
+    {
+        <div class="card">
+            <table class="data-table">
+                <thead>
+                    <tr><th>Tên</th><th>Loại</th><th>Điều kiện</th><th>Hiệu lực</th><th>Trạng thái</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var r in rules)
+                    {
+                        <tr>
+                            <td>@r.Name</td>
+                            <td>@(r.Type == PromotionRuleType.QuantityTier ? "Bậc thang" : "Combo")</td>
+                            <td>
+                                @if (r.Type == PromotionRuleType.QuantityTier)
+                                {
+                                    <span>Từ @r.Threshold đơn vị → giảm @r.DiscountPercent%</span>
+                                }
+                                else
+                                {
+                                    <span>≥2 sản phẩm mỗi loại ≥@r.MinQtyPerProduct → tặng @r.FreeUnitsPerProduct/loại</span>
+                                }
+                            </td>
+                            <td>
+                                @(r.EffectiveFrom?.ToString("dd/MM/yyyy") ?? "—") → @(r.EffectiveTo?.ToString("dd/MM/yyyy") ?? "Vô hạn")
+                            </td>
+                            <td>
+                                <span class="channel-badge @(r.IsActive ? "active" : "inactive")">@(r.IsActive ? "Đang bật" : "Đã tắt")</span>
+                            </td>
+                            <td class="row-actions">
+                                <button class="btn-link" @onclick="() => OpenEditForm(r)">Sửa</button>
+                                <button class="btn-link danger" @onclick="() => DeleteRule(r)">Xoá</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+}
+
+<style>
+    .page-header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
+    .btn-primary {
+        background: var(--brand); color: #fff; border: none; border-radius: 8px;
+        padding: 0.6rem 1.2rem; font-weight: 600; cursor: pointer; font-size: 0.85rem;
+    }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-outline {
+        border: 1px solid var(--line-strong); color: var(--ink); background: var(--surface);
+        padding: 0.55rem 1rem; border-radius: 8px; font-weight: 600; font-size: 0.85rem; cursor: pointer;
+    }
+    .btn-link { background: none; border: none; cursor: pointer; color: var(--brand); font-weight: 600; font-size: 0.83rem; padding: 0.2rem 0.4rem; }
+    .btn-link.danger { color: var(--danger); }
+    .btn-link:hover { text-decoration: underline; }
+    .row-actions { white-space: nowrap; text-align: right; }
+    .muted { color: var(--muted); font-size: 0.85rem; }
+
+    .form-card { margin-bottom: 1.5rem; }
+    .form-card h3 { margin-bottom: 1rem; }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem; }
+    @@media (max-width: 700px) {
+        .field-row { grid-template-columns: 1fr; }
+    }
+    .field { margin-bottom: 1rem; }
+    .field label { display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 0.35rem; }
+    .field input, .field select { width: 100%; padding: 0.55rem 0.7rem; border: 1px solid var(--line-strong); border-radius: 8px; font-size: 0.88rem; box-sizing: border-box; }
+    .field-checkbox label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.88rem; font-weight: 500; cursor: pointer; }
+    .field-checkbox input { width: auto !important; accent-color: var(--brand); }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 1.25rem; }
+
+    .channel-badge { font-size: 0.75rem; font-weight: 650; padding: 0.2rem 0.55rem; border-radius: 999px; }
+    .channel-badge.active { background: var(--success-soft); color: var(--success); }
+    .channel-badge.inactive { background: #eef1f5; color: #475569; }
+</style>
+
+@code {
+    private List<PromotionRule>? rules;
+    private string? errorMessage;
+
+    private bool showForm;
+    private int? editingId;
+    private RuleFormModel formModel = new();
+    private string? formError;
+    private bool saving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Auth.Role != UserRole.Admin) return;
+        await LoadRules();
+    }
+
+    private async Task LoadRules()
+    {
+        try
+        {
+            rules = await Api.GetPromotionRulesAsync();
+        }
+        catch
+        {
+            errorMessage = "Không tải được danh sách khuyến mãi.";
+        }
+    }
+
+    private void OpenCreateForm()
+    {
+        editingId = null;
+        formModel = new RuleFormModel();
+        formError = null;
+        showForm = true;
+    }
+
+    private void OpenEditForm(PromotionRule r)
+    {
+        editingId = r.Id;
+        formModel = new RuleFormModel
+        {
+            Name = r.Name,
+            Type = r.Type,
+            IsActive = r.IsActive,
+            Threshold = r.Threshold,
+            DiscountPercent = r.DiscountPercent,
+            MinQtyPerProduct = r.MinQtyPerProduct,
+            FreeUnitsPerProduct = r.FreeUnitsPerProduct,
+            EffectiveFrom = r.EffectiveFrom?.ToDateTime(TimeOnly.MinValue),
+            EffectiveTo = r.EffectiveTo?.ToDateTime(TimeOnly.MinValue)
+        };
+        formError = null;
+        showForm = true;
+    }
+
+    private void CloseForm() => showForm = false;
+
+    private async Task SaveRule()
+    {
+        saving = true;
+        formError = null;
+
+        var rule = new PromotionRule
+        {
+            Name = formModel.Name.Trim(),
+            Type = formModel.Type,
+            IsActive = formModel.IsActive,
+            Threshold = formModel.Threshold,
+            DiscountPercent = formModel.DiscountPercent,
+            MinQtyPerProduct = formModel.MinQtyPerProduct,
+            FreeUnitsPerProduct = formModel.FreeUnitsPerProduct,
+            EffectiveFrom = formModel.EffectiveFrom is { } from ? DateOnly.FromDateTime(from) : null,
+            EffectiveTo = formModel.EffectiveTo is { } to ? DateOnly.FromDateTime(to) : null
+        };
+
+        var (success, error) = editingId is null
+            ? await Api.CreatePromotionRuleAsync(rule)
+            : await Api.UpdatePromotionRuleAsync(editingId.Value, rule);
+
+        saving = false;
+
+        if (!success)
+        {
+            formError = error ?? "Lưu không thành công.";
+            return;
+        }
+
+        showForm = false;
+        await LoadRules();
+    }
+
+    private async Task DeleteRule(PromotionRule r)
+    {
+        await Api.DeletePromotionRuleAsync(r.Id);
+        await LoadRules();
+    }
+
+    public class RuleFormModel
+    {
+        [Required(ErrorMessage = "Bắt buộc nhập tên khuyến mãi")]
+        public string Name { get; set; } = "";
+
+        public PromotionRuleType Type { get; set; } = PromotionRuleType.QuantityTier;
+        public bool IsActive { get; set; } = true;
+
+        [Range(1, int.MaxValue, ErrorMessage = "Ngưỡng phải lớn hơn 0")]
+        public int Threshold { get; set; } = 50;
+
+        [Range(0, 100, ErrorMessage = "Chiết khấu phải từ 0 đến 100")]
+        public decimal DiscountPercent { get; set; } = 5;
+
+        [Range(1, int.MaxValue, ErrorMessage = "Ngưỡng phải lớn hơn 0")]
+        public int MinQtyPerProduct { get; set; } = 20;
+
+        [Range(1, int.MaxValue, ErrorMessage = "Số lượng tặng phải lớn hơn 0")]
+        public int FreeUnitsPerProduct { get; set; } = 1;
+
+        public DateTime? EffectiveFrom { get; set; }
+        public DateTime? EffectiveTo { get; set; }
+    }
+}

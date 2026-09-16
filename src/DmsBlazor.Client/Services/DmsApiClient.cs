@@ -227,6 +227,31 @@ public class DmsApiClient(HttpClient http)
     public Task<List<DistributorDiscountHistory>?> GetDistributorDiscountHistoryAsync(int id) =>
         http.GetFromJsonAsync<List<DistributorDiscountHistory>>($"api/distributors/{id}/discount-history");
 
+    // ===== Khuyến mãi (cấu hình động) =====
+
+    public Task<List<PromotionRule>?> GetPromotionRulesAsync() =>
+        http.GetFromJsonAsync<List<PromotionRule>>("api/promotionrules");
+
+    public async Task<(bool Success, string? Error)> CreatePromotionRuleAsync(PromotionRule rule)
+    {
+        var res = await http.PostAsJsonAsync("api/promotionrules", rule);
+        if (res.IsSuccessStatusCode) return (true, null);
+        return (false, await res.Content.ReadAsStringAsync());
+    }
+
+    public async Task<(bool Success, string? Error)> UpdatePromotionRuleAsync(int id, PromotionRule rule)
+    {
+        var res = await http.PutAsJsonAsync($"api/promotionrules/{id}", rule);
+        if (res.IsSuccessStatusCode) return (true, null);
+        return (false, await res.Content.ReadAsStringAsync());
+    }
+
+    public async Task<bool> DeletePromotionRuleAsync(int id)
+    {
+        var res = await http.DeleteAsync($"api/promotionrules/{id}");
+        return res.IsSuccessStatusCode;
+    }
+
     public async Task<bool> DeleteDistributorAsync(int id)
     {
         var res = await http.DeleteAsync($"api/distributors/{id}");

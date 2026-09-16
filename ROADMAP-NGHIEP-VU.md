@@ -14,11 +14,11 @@ Làm dần từng mục, không cần làm hết 1 lần. Đánh dấu `[x]` khi
 
 Hiện tại: chiết khấu bậc thang cố định 2 mức (≥50 → 5%, ≥100 → 10%) theo tổng số lượng cả đơn, combo tặng kèm cố định (≥2 sản phẩm, mỗi loại ≥20 → tặng 1 đơn vị/loại), cộng thẳng chiết khấu riêng theo NPP.
 
-- [ ] **Khuyến mãi có hiệu lực theo thời gian** — hiện tại các mức chiết khấu là hằng số code cứng, không đổi được mà không deploy lại. Thêm bảng `promotion_rules` (loại: bậc thang/combo, ngưỡng, %, ngày bắt đầu/kết thúc), Admin tự cấu hình qua UI thay vì sửa code.
+- [x] **Khuyến mãi có hiệu lực theo thời gian** — Bảng `promotion_rules` (bậc thang/combo, ngưỡng, %, EffectiveFrom/To), trang `/khuyen-mai` (Admin). Bảng rỗng thì tự dùng mặc định cũ (≥50→5%, ≥100→10%, combo ≥20→tặng 1) để không phá hành vi hiện tại. (2026-09-16)
 - [ ] **Chiết khấu theo từng sản phẩm/nhóm sản phẩm** — hiện chiết khấu bậc thang áp dụng đều cho tổng đơn bất kể sản phẩm gì. Cần phân biệt: có sản phẩm không được giảm giá (hàng mới ra mắt), có sản phẩm giảm giá riêng cao hơn (hàng tồn kho lâu).
 - [ ] **Giới hạn số lần áp dụng khuyến mãi/NPP/tháng** — tránh 1 NPP đặt nhiều đơn nhỏ để lách ngưỡng chiết khấu, hoặc ngược lại giới hạn số lần được hưởng combo tặng kèm.
 - [ ] **Giá theo hợp đồng riêng từng NPP** (khác với `ExtraDiscountPercent` đã có) — 1 số NPP lớn có bảng giá riêng hoàn toàn thay vì % chiết khấu cộng thêm.
-- [ ] **Cảnh báo/chặn khi vượt hạn mức công nợ lúc đặt hàng** — hiện tại `CreditLimit` chỉ hiển thị cảnh báo ở trang Công nợ sau khi đã đặt, không chặn lúc đặt đơn mới. Cần quyết định: chặn cứng hay chỉ cảnh báo cho phép vượt.
+- [x] **Cảnh báo/chặn khi vượt hạn mức công nợ lúc đặt hàng** — Mặc định chỉ cảnh báo (màu vàng trong giỏ hàng); Admin bật `BlockOverCreditLimit` theo từng NPP để chặn cứng (409). Mọi trường hợp vượt hạn mức ghi audit log. (2026-09-16)
 
 ## 2. Tồn kho — `InventoryService.cs`
 
