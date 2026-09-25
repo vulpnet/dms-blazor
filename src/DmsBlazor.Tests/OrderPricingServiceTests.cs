@@ -139,4 +139,47 @@ public class OrderPricingServiceTests
         Assert.True(result.ComboBonusApplied);
         Assert.All(result.Lines, l => Assert.Equal(3, l.FreeUnits));
     }
+
+    [Fact]
+    public void SanPham_DiscountEligibleFalse_LuonBanDungGiaGoc()
+    {
+        // Sản phẩm mới ra mắt, không muốn giảm giá dù đơn đạt ngưỡng bậc thang.
+        var catalogWithExcluded = new List<Product>
+        {
+            new() { Id = 1, Code = "cola-330", Name = "Cola", PricePerCase = 168, PricePerUnit = 8, DiscountEligible = false },
+        };
+
+        var result = OrderPricingService.Price(
+            [new OrderLineInput { ProductId = 1, Qty = 60 }], catalogWithExcluded, SalesChannel.Npp);
+
+        // Tổng đạt tier1 (>=50 -> 5%) nhưng dòng này bị loại trừ -> vẫn 0% riêng dòng.
+        Assert.Equal("tier1", result.AppliedTier);
+        Assert.Equal(0m, result.Lines[0].LineDiscountPercent);
+        Assert.Equal(0m, result.Lines[0].LineDiscountAmount);
+        Assert.Equal(0m, result.DiscountAmount);
+        Assert.Equal(result.Subtotal, result.Total);
+    }
+
+    [Fact]
+    public void SanPham_ExtraDiscountPercentRieng_ChiCongThemDongDo()
+    {
+        // Hàng tồn kho lâu, giảm thêm riêng sản phẩm này ngoài chiết khấu bậc thang chung.
+        var catalogWithExtra = new List<Product>
+        {
+            new() { Id = 1, Code = "cola-330", Name = "Cola", PricePerCase = 168, PricePerUnit = 8, ExtraDiscountPercent = 10 },
+            new() { Id = 2, Code = "suoi-500", Name = "Suối", PricePerCase = 96, PricePerUnit = 5 },
+        };
+
+        var result = OrderPricingService.Price(
+            [
+                new OrderLineInput { ProductId = 1, Qty = 30 },
+                new OrderLineInput { ProductId = 2, Qty = 30 },
+            ], catalogWithExtra, SalesChannel.Npp);
+
+        // Tổng 60 -> tier1 5% cho cả 2 dòng, riêng dòng Cola cộng thêm 10% -> 15%.
+        var colaLine = result.Lines.Single(l => l.Product.Id == 1);
+        var suoiLine = result.Lines.Single(l => l.Product.Id == 2);
+        Assert.Equal(15m, colaLine.LineDiscountPercent);
+        Assert.Equal(5m, suoiLine.LineDiscountPercent);
+    }
 }

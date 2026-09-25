@@ -126,6 +126,14 @@ else
                                     {
                                         <span class="free-tag">+ tặng @line.FreeUnits</span>
                                     }
+                                    @if (!line.Product.DiscountEligible)
+                                    {
+                                        <span class="no-discount-tag">Không giảm giá</span>
+                                    }
+                                    else if (line.LineDiscountPercent > 0)
+                                    {
+                                        <span class="discount-tag">-@line.LineDiscountPercent%</span>
+                                    }
                                 </div>
                             </div>
                             <div class="cart-line-actions">
@@ -231,6 +239,24 @@ else
         font-weight: 650;
         margin-left: 0.35rem;
         background: var(--success-soft);
+        padding: 0.05rem 0.4rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+    }
+    .discount-tag {
+        color: var(--brand);
+        font-weight: 650;
+        margin-left: 0.35rem;
+        background: var(--brand-soft);
+        padding: 0.05rem 0.4rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+    }
+    .no-discount-tag {
+        color: var(--muted);
+        font-weight: 600;
+        margin-left: 0.35rem;
+        background: #eef1f5;
         padding: 0.05rem 0.4rem;
         border-radius: 4px;
         font-size: 0.75rem;

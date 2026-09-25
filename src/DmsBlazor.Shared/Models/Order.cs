@@ -27,6 +27,12 @@ public class PricedOrderLine
     public decimal UnitPrice { get; set; }
     public decimal LineTotal { get; set; }
     public int FreeUnits { get; set; }
+
+    // % chiết khấu áp cho RIÊNG dòng này (bậc thang chung + ExtraDiscountPercent của
+    // sản phẩm, hoặc 0 nếu Product.DiscountEligible=false) — khác PricedOrder.DiscountPercent
+    // là % trung bình toàn đơn dùng để hiển thị tổng quan.
+    public decimal LineDiscountPercent { get; set; }
+    public decimal LineDiscountAmount { get; set; }
 }
 
 public class PricedOrder

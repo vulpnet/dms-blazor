@@ -65,6 +65,8 @@ public class DmsDbContext(DbContextOptions<DmsDbContext> options) : DbContext(op
             e.Property(x => x.PricePerCase).HasPrecision(12, 2);
             e.Property(x => x.PricePerUnit).HasPrecision(12, 2);
             e.Property(x => x.IsActive).HasDefaultValue(true);
+            e.Property(x => x.DiscountEligible).HasDefaultValue(true);
+            e.Property(x => x.ExtraDiscountPercent).HasPrecision(5, 2);
         });
 
         // Sequence Postgres cho số thứ tự đơn hàng/chuyến giao — atomic ở tầng DB,

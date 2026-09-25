@@ -13,6 +13,12 @@ namespace DmsBlazor.Shared.Services;
 /// PromotionRule nào qua UI (bảng promotion_rules) — truyền activeRules để ghi đè
 /// bằng khuyến mãi có hiệu lực theo thời gian, không cần deploy lại code. Giữ
 /// overload không tham số rule để không phá test cũ/hành vi hiện tại khi DB rỗng.
+///
+/// Từ 2026-09-25: % chiết khấu bậc thang tính theo TotalQty như cũ (không đổi ngưỡng
+/// đạt được), nhưng áp dụng RIÊNG cho từng dòng thay vì đều lên subtotal — dòng có
+/// Product.DiscountEligible=false luôn 0%, dòng có Product.ExtraDiscountPercent được
+/// cộng thêm riêng dòng đó. PricedOrder.DiscountPercent/Amount vẫn giữ nghĩa "gộp
+/// toàn đơn" (tổng LineDiscountAmount / subtotal) để không phá UI hiển thị hiện có.
 /// </summary>
 public static class OrderPricingService
 {
@@ -48,7 +54,7 @@ public static class OrderPricingService
         var subtotal = lines.Sum(l => l.LineTotal);
 
         var tierRules = activeRules?.Where(r => r.Type == PromotionRuleType.QuantityTier).ToList();
-        var (discountPercent, appliedTier) = tierRules is { Count: > 0 }
+        var (tierDiscountPercent, appliedTier) = tierRules is { Count: > 0 }
             ? ApplyConfiguredTiers(totalQty, tierRules)
             : ApplyDefaultTiers(totalQty);
 
@@ -57,19 +63,35 @@ public static class OrderPricingService
             ? ApplyConfiguredCombos(lines, comboRules)
             : ApplyDefaultCombo(lines);
 
-        // Chiết khấu riêng theo NPP (hợp đồng) cộng thẳng vào chiết khấu bậc thang —
-        // đơn giản, dễ hiểu trên hoá đơn (1 dòng %) thay vì 2 dòng chiết khấu riêng.
-        var totalDiscountPercent = discountPercent + extraDiscountPercent;
-        var discountAmount = Math.Round(subtotal * (totalDiscountPercent / 100), MidpointRounding.AwayFromZero);
-        var total = subtotal - discountAmount;
+        // Áp % theo từng dòng — không phải đều lên subtotal. NPP-level extraDiscountPercent
+        // (hợp đồng theo NPP) áp đều cho mọi dòng đủ điều kiện; ExtraDiscountPercent của
+        // Product chỉ cộng thêm cho riêng dòng đó. Sản phẩm DiscountEligible=false bỏ qua
+        // CẢ HAI, luôn bán đúng giá gốc dù đơn đạt ngưỡng bậc thang.
+        decimal totalDiscountAmount = 0;
+        foreach (var line in lines)
+        {
+            var lineDiscountPercent = line.Product.DiscountEligible
+                ? tierDiscountPercent + extraDiscountPercent + line.Product.ExtraDiscountPercent
+                : 0;
+            var lineDiscountAmount = Math.Round(line.LineTotal * (lineDiscountPercent / 100), MidpointRounding.AwayFromZero);
+
+            line.LineDiscountPercent = lineDiscountPercent;
+            line.LineDiscountAmount = lineDiscountAmount;
+            totalDiscountAmount += lineDiscountAmount;
+        }
+
+        var total = subtotal - totalDiscountAmount;
+        // % trung bình toàn đơn chỉ để hiển thị tổng quan — KHÔNG dùng lại giá trị này
+        // để tính tiền (đã tính đúng theo từng dòng ở trên), tránh sai số làm tròn kép.
+        var averageDiscountPercent = subtotal > 0 ? Math.Round(totalDiscountAmount / subtotal * 100, 2) : 0;
 
         return new PricedOrder
         {
             Lines = lines,
             TotalQty = totalQty,
             Subtotal = subtotal,
-            DiscountPercent = totalDiscountPercent,
-            DiscountAmount = discountAmount,
+            DiscountPercent = averageDiscountPercent,
+            DiscountAmount = totalDiscountAmount,
             Total = total,
             AppliedTier = appliedTier,
             ComboBonusApplied = comboBonusApplied

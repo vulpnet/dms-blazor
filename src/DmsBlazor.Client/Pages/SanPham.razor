@@ -58,6 +58,7 @@ else
                     <th>Danh mục</th>
                     <th>Giá thùng</th>
                     <th>Giá lẻ</th>
+                    <th>Chiết khấu</th>
                     <th>Đang bán</th>
                     <th></th>
                 </tr>
@@ -72,6 +73,20 @@ else
                         <td>@p.Category</td>
                         <td>@p.PricePerCase.ToString("N0")k / @p.CaseSize @p.Unit</td>
                         <td>@p.PricePerUnit.ToString("N0")k / @p.Unit</td>
+                        <td>
+                            @if (!p.DiscountEligible)
+                            {
+                                <span class="channel-badge inactive">Không giảm giá</span>
+                            }
+                            else if (p.ExtraDiscountPercent > 0)
+                            {
+                                <span class="channel-badge active">+@p.ExtraDiscountPercent%</span>
+                            }
+                            else
+                            {
+                                <span class="muted">—</span>
+                            }
+                        </td>
                         <td>
                             <label class="toggle">
                                 <input type="checkbox" checked="@p.IsActive" @onchange="e => ToggleActive(p, (bool)e.Value!)" />
@@ -150,6 +165,21 @@ else
                     </label>
                 </div>
 
+                <div class="field field-checkbox">
+                    <label>
+                        <InputCheckbox @bind-Value="formModel.DiscountEligible" />
+                        Được áp chiết khấu bậc thang/combo chung của đơn
+                    </label>
+                </div>
+
+                @if (formModel.DiscountEligible)
+                {
+                    <div class="field">
+                        <label for="f-extradiscount">Chiết khấu riêng cộng thêm (%, 0 = không có)</label>
+                        <InputNumber id="f-extradiscount" @bind-Value="formModel.ExtraDiscountPercent" />
+                    </div>
+                }
+
                 @if (formError is not null)
                 {
                     <div class="alert-error">@formError</div>
@@ -193,6 +223,10 @@ else
     }
     .btn-link.danger { color: var(--danger); }
     .btn-link:hover { text-decoration: underline; }
+    .muted { color: var(--muted); font-size: 0.85rem; }
+    .channel-badge { font-size: 0.75rem; font-weight: 650; padding: 0.2rem 0.55rem; border-radius: 999px; }
+    .channel-badge.active { background: var(--success-soft); color: var(--success); }
+    .channel-badge.inactive { background: #eef1f5; color: #475569; }
 
     .modal-backdrop {
         position: fixed; inset: 0;
@@ -312,7 +346,9 @@ else
             PricePerUnit = p.PricePerUnit,
             Emoji = p.Emoji,
             IsActive = p.IsActive,
-            LowStockThreshold = p.LowStockThreshold
+            LowStockThreshold = p.LowStockThreshold,
+            DiscountEligible = p.DiscountEligible,
+            ExtraDiscountPercent = p.ExtraDiscountPercent
         };
         formError = null;
         showForm = true;
@@ -336,7 +372,9 @@ else
             PricePerUnit = formModel.PricePerUnit,
             Emoji = string.IsNullOrWhiteSpace(formModel.Emoji) ? "📦" : formModel.Emoji.Trim(),
             IsActive = formModel.IsActive,
-            LowStockThreshold = formModel.LowStockThreshold
+            LowStockThreshold = formModel.LowStockThreshold,
+            DiscountEligible = formModel.DiscountEligible,
+            ExtraDiscountPercent = formModel.DiscountEligible ? formModel.ExtraDiscountPercent : 0
         };
 
         var (success, error) = editingId is null
@@ -371,7 +409,9 @@ else
             PricePerUnit = p.PricePerUnit,
             Emoji = p.Emoji,
             IsActive = isActive,
-            LowStockThreshold = p.LowStockThreshold
+            LowStockThreshold = p.LowStockThreshold,
+            DiscountEligible = p.DiscountEligible,
+            ExtraDiscountPercent = p.ExtraDiscountPercent
         };
         var (success, _) = await Api.UpdateProductAsync(p.Id, updated);
         if (!success) await LoadProducts();
@@ -418,5 +458,10 @@ else
 
         [Range(0, 1000000, ErrorMessage = "Ngưỡng cảnh báo không hợp lệ")]
         public int LowStockThreshold { get; set; }
+
+        public bool DiscountEligible { get; set; } = true;
+
+        [Range(0, 100, ErrorMessage = "Chiết khấu phải từ 0 đến 100")]
+        public decimal ExtraDiscountPercent { get; set; }
     }
 }

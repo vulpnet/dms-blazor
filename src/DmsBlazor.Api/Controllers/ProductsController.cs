@@ -55,6 +55,8 @@ public class ProductsController(DmsDbContext db, AuditLogger audit) : Controller
         product.Emoji = input.Emoji;
         product.IsActive = input.IsActive;
         product.LowStockThreshold = input.LowStockThreshold;
+        product.DiscountEligible = input.DiscountEligible;
+        product.ExtraDiscountPercent = input.ExtraDiscountPercent;
 
         await db.SaveChangesAsync();
         await audit.LogAsync(User, "Update", "Product", id.ToString(), $"Sửa sản phẩm '{product.Name}' ({product.Code})");
