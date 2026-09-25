@@ -19,7 +19,7 @@ public class OrdersController(DmsDbContext db, AuditLogger audit) : ControllerBa
     {
         var products = await db.Products.Where(p => p.IsActive).ToListAsync();
         var distributor = await GetDistributorAsync(request);
-        var activeRules = await PromotionRulesController.GetActiveRulesAsync(db);
+        var activeRules = await PromotionRulesController.GetActiveRulesAsync(db, distributor?.Id);
         var priced = OrderPricingService.Price(request.Lines, products, request.Channel, distributor?.ExtraDiscountPercent ?? 0, activeRules);
         await AttachDebtWarningAsync(priced, distributor);
         return priced;
@@ -57,7 +57,7 @@ public class OrdersController(DmsDbContext db, AuditLogger audit) : ControllerBa
     {
         var products = await db.Products.Where(p => p.IsActive).ToListAsync();
         var distributor = await GetDistributorAsync(request);
-        var activeRules = await PromotionRulesController.GetActiveRulesAsync(db);
+        var activeRules = await PromotionRulesController.GetActiveRulesAsync(db, distributor?.Id);
         var priced = OrderPricingService.Price(request.Lines, products, request.Channel, distributor?.ExtraDiscountPercent ?? 0, activeRules);
 
         if (priced.Lines.Count == 0)
@@ -142,6 +142,16 @@ public class OrdersController(DmsDbContext db, AuditLogger audit) : ControllerBa
                     InventoryTransactionType.OrderReserved, refCode: order.OrderCode);
             }
 
+            // Chỉ tính là "đã dùng" khi đơn THẬT SỰ được xác nhận (trong transaction
+            // này, không phải ở Price chỉ xem trước) — và chỉ với rule cấu hình qua
+            // UI (AppliedTier dạng "rule-{id}"), không áp dụng cho mức mặc định cứng
+            // (tier1/tier2) vì mặc định không có khái niệm giới hạn số lần dùng.
+            if (distributor is not null && priced.AppliedTier is { } tier && tier.StartsWith("rule-")
+                && int.TryParse(tier["rule-".Length..], out var ruleId))
+            {
+                await PromotionRulesController.IncrementUsageAsync(db, ruleId, distributor.Id);
+            }
+
             await db.SaveChangesAsync();
             await transaction.CommitAsync();
         }
@@ -213,7 +223,7 @@ public class OrdersController(DmsDbContext db, AuditLogger audit) : ControllerBa
             return Conflict("Đơn hàng đã huỷ, không thể chỉnh sửa.");
 
         var products = await db.Products.ToListAsync(); // cho sửa cả sản phẩm đã ngừng bán nếu đã có sẵn trong đơn cũ
-        var activeRules = await PromotionRulesController.GetActiveRulesAsync(db);
+        var activeRules = await PromotionRulesController.GetActiveRulesAsync(db, order.DistributorId);
         var priced = OrderPricingService.Price(request.Lines, products, order.Channel, activeRules: activeRules);
 
         if (priced.Lines.Count == 0)

@@ -25,6 +25,7 @@ public class DmsDbContext(DbContextOptions<DmsDbContext> options) : DbContext(op
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<DistributorDiscountHistory> DistributorDiscountHistories => Set<DistributorDiscountHistory>();
     public DbSet<PromotionRule> PromotionRules => Set<PromotionRule>();
+    public DbSet<PromotionRuleUsage> PromotionRuleUsages => Set<PromotionRuleUsage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -231,6 +232,14 @@ public class DmsDbContext(DbContextOptions<DmsDbContext> options) : DbContext(op
             e.Property(x => x.Name).HasMaxLength(200).IsRequired();
             e.Property(x => x.DiscountPercent).HasPrecision(5, 2);
             e.Property(x => x.IsActive).HasDefaultValue(true);
+        });
+
+        modelBuilder.Entity<PromotionRuleUsage>(e =>
+        {
+            e.ToTable("promotion_rule_usages");
+            // 1 dòng duy nhất/ (rule, NPP, tháng) — atomic UPDATE cộng dồn Count qua
+            // INSERT ... ON CONFLICT giống InventoryService, không phải đọc-rồi-ghi.
+            e.HasIndex(x => new { x.RuleId, x.DistributorId, x.Year, x.Month }).IsUnique();
         });
     }
 }

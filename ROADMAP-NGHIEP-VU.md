@@ -16,7 +16,7 @@ Hiện tại: chiết khấu bậc thang cố định 2 mức (≥50 → 5%, ≥
 
 - [x] **Khuyến mãi có hiệu lực theo thời gian** — Bảng `promotion_rules` (bậc thang/combo, ngưỡng, %, EffectiveFrom/To), trang `/khuyen-mai` (Admin). Bảng rỗng thì tự dùng mặc định cũ (≥50→5%, ≥100→10%, combo ≥20→tặng 1) để không phá hành vi hiện tại. (2026-09-16)
 - [x] **Chiết khấu theo từng sản phẩm/nhóm sản phẩm** — `Product.DiscountEligible` (false = luôn 0% dù đơn đạt ngưỡng) + `Product.ExtraDiscountPercent` (cộng thêm riêng dòng đó). Tính discount theo TỪNG DÒNG thay vì đều lên subtotal. Cấu hình ở trang Sản phẩm, hiện breakdown ở giỏ hàng Đặt hàng. (2026-09-25)
-- [ ] **Giới hạn số lần áp dụng khuyến mãi/NPP/tháng** — tránh 1 NPP đặt nhiều đơn nhỏ để lách ngưỡng chiết khấu, hoặc ngược lại giới hạn số lần được hưởng combo tặng kèm.
+- [x] **Giới hạn số lần áp dụng khuyến mãi/NPP/tháng** — `PromotionRule.MaxUsagePerDistributorPerMonth` (0 = không giới hạn) + bảng `promotion_rule_usages` (atomic UPDATE giống InventoryStock). Rule đã dùng hết bị lọc khỏi activeRules cho đúng NPP đó, NPP khác không bị ảnh hưởng. Chỉ tăng count khi đơn thật sự Confirm (không tính lúc Price xem trước). (2026-09-25)
 - [ ] **Giá theo hợp đồng riêng từng NPP** (khác với `ExtraDiscountPercent` đã có) — 1 số NPP lớn có bảng giá riêng hoàn toàn thay vì % chiết khấu cộng thêm.
 - [x] **Cảnh báo/chặn khi vượt hạn mức công nợ lúc đặt hàng** — Mặc định chỉ cảnh báo (màu vàng trong giỏ hàng); Admin bật `BlockOverCreditLimit` theo từng NPP để chặn cứng (409). Mọi trường hợp vượt hạn mức ghi audit log. (2026-09-16)
 

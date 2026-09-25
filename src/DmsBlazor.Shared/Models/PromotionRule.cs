@@ -29,4 +29,23 @@ public class PromotionRule
 
     public DateOnly? EffectiveFrom { get; set; }
     public DateOnly? EffectiveTo { get; set; }
+
+    // 0 = không giới hạn. >0 = mỗi NPP chỉ được hưởng rule này tối đa N lần/tháng
+    // (đếm theo tháng dương lịch hiện tại, giờ VN) — chỉ có ý nghĩa với kênh NPP
+    // (có DistributorId); kênh Retail không áp dụng giới hạn này (không có khái
+    // niệm "khách hàng" cố định theo dõi lâu dài như NPP).
+    public int MaxUsagePerDistributorPerMonth { get; set; }
+}
+
+/// <summary>Đếm số lần 1 NPP đã dùng 1 PromotionRule có giới hạn trong 1 tháng —
+/// tách bảng riêng thay vì đếm ngược từ Order (join phức tạp, dễ sai khi sửa/huỷ
+/// đơn) và để atomic UPDATE tăng Count giống cơ chế InventoryStock.</summary>
+public class PromotionRuleUsage
+{
+    public int Id { get; set; }
+    public int RuleId { get; set; }
+    public int DistributorId { get; set; }
+    public int Year { get; set; }
+    public int Month { get; set; }
+    public int Count { get; set; }
 }

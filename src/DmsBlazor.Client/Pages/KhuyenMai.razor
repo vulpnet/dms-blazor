@@ -86,6 +86,12 @@ else
                     </div>
                 </div>
 
+                <div class="field">
+                    <label for="f-maxusage">Giới hạn số lần/NPP/tháng (0 = không giới hạn)</label>
+                    <InputNumber id="f-maxusage" @bind-Value="formModel.MaxUsagePerDistributorPerMonth" />
+                    <p class="field-hint">Chỉ áp dụng cho đơn kênh NPP — mỗi NPP chỉ được hưởng khuyến mãi này tối đa N lần/tháng, tránh đặt nhiều đơn nhỏ để lách ngưỡng.</p>
+                </div>
+
                 <div class="field field-checkbox">
                     <label>
                         <InputCheckbox @bind-Value="formModel.IsActive" />
@@ -119,7 +125,7 @@ else
         <div class="card">
             <table class="data-table">
                 <thead>
-                    <tr><th>Tên</th><th>Loại</th><th>Điều kiện</th><th>Hiệu lực</th><th>Trạng thái</th><th></th></tr>
+                    <tr><th>Tên</th><th>Loại</th><th>Điều kiện</th><th>Giới hạn/NPP/tháng</th><th>Hiệu lực</th><th>Trạng thái</th><th></th></tr>
                 </thead>
                 <tbody>
                     @foreach (var r in rules)
@@ -137,6 +143,7 @@ else
                                     <span>≥2 sản phẩm mỗi loại ≥@r.MinQtyPerProduct → tặng @r.FreeUnitsPerProduct/loại</span>
                                 }
                             </td>
+                            <td>@(r.MaxUsagePerDistributorPerMonth > 0 ? $"{r.MaxUsagePerDistributorPerMonth} lần" : "Không giới hạn")</td>
                             <td>
                                 @(r.EffectiveFrom?.ToString("dd/MM/yyyy") ?? "—") → @(r.EffectiveTo?.ToString("dd/MM/yyyy") ?? "Vô hạn")
                             </td>
@@ -180,6 +187,7 @@ else
     }
     .field { margin-bottom: 1rem; }
     .field label { display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 0.35rem; }
+    .field-hint { margin: 0.35rem 0 0; font-size: 0.78rem; color: var(--muted); }
     .field input, .field select { width: 100%; padding: 0.55rem 0.7rem; border: 1px solid var(--line-strong); border-radius: 8px; font-size: 0.88rem; box-sizing: border-box; }
     .field-checkbox label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.88rem; font-weight: 500; cursor: pointer; }
     .field-checkbox input { width: auto !important; accent-color: var(--brand); }
@@ -239,7 +247,8 @@ else
             MinQtyPerProduct = r.MinQtyPerProduct,
             FreeUnitsPerProduct = r.FreeUnitsPerProduct,
             EffectiveFrom = r.EffectiveFrom?.ToDateTime(TimeOnly.MinValue),
-            EffectiveTo = r.EffectiveTo?.ToDateTime(TimeOnly.MinValue)
+            EffectiveTo = r.EffectiveTo?.ToDateTime(TimeOnly.MinValue),
+            MaxUsagePerDistributorPerMonth = r.MaxUsagePerDistributorPerMonth
         };
         formError = null;
         showForm = true;
@@ -262,7 +271,8 @@ else
             MinQtyPerProduct = formModel.MinQtyPerProduct,
             FreeUnitsPerProduct = formModel.FreeUnitsPerProduct,
             EffectiveFrom = formModel.EffectiveFrom is { } from ? DateOnly.FromDateTime(from) : null,
-            EffectiveTo = formModel.EffectiveTo is { } to ? DateOnly.FromDateTime(to) : null
+            EffectiveTo = formModel.EffectiveTo is { } to ? DateOnly.FromDateTime(to) : null,
+            MaxUsagePerDistributorPerMonth = formModel.MaxUsagePerDistributorPerMonth
         };
 
         var (success, error) = editingId is null
@@ -309,5 +319,8 @@ else
 
         public DateTime? EffectiveFrom { get; set; }
         public DateTime? EffectiveTo { get; set; }
+
+        [Range(0, int.MaxValue, ErrorMessage = "Giới hạn không hợp lệ")]
+        public int MaxUsagePerDistributorPerMonth { get; set; }
     }
 }

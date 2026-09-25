@@ -3,6 +3,8 @@ using DmsBlazor.Shared.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
+using Npgsql;
 
 namespace DmsBlazor.Api.Controllers;
 
@@ -17,17 +19,71 @@ public class PromotionRulesController(DmsDbContext db, AuditLogger audit) : Cont
     public async Task<ActionResult<List<PromotionRule>>> GetAll() =>
         await db.PromotionRules.OrderBy(r => r.Type).ThenBy(r => r.Threshold).ToListAsync();
 
-    /// <summary>Danh sách rule đang thật sự có hiệu lực HÔM NAY — dùng chung bởi
+    /// <summary>Danh sách rule đang thật sự có hiệu lực HÔM NAY, ĐÃ LOẠI những rule
+    /// 1 NPP cụ thể đã dùng hết giới hạn tháng này — dùng chung bởi
     /// OrdersController.Price/Confirm, tách riêng để 2 nơi đó không tự lặp lại điều
-    /// kiện lọc IsActive + khoảng ngày.</summary>
-    public static async Task<List<PromotionRule>> GetActiveRulesAsync(DmsDbContext db)
+    /// kiện lọc IsActive + khoảng ngày + giới hạn sử dụng.
+    /// distributorId null (kênh Retail hoặc chưa chọn NPP) -> không lọc giới hạn,
+    /// vì MaxUsagePerDistributorPerMonth chỉ có ý nghĩa khi biết NPP nào.</summary>
+    public static async Task<List<PromotionRule>> GetActiveRulesAsync(DmsDbContext db, int? distributorId = null)
     {
         var today = DateOnly.FromDateTime(DateTimeOffset.UtcNow.ToOffset(TimeSpan.FromHours(7)).Date);
-        return await db.PromotionRules
+        var rules = await db.PromotionRules
             .Where(r => r.IsActive)
             .Where(r => r.EffectiveFrom == null || r.EffectiveFrom <= today)
             .Where(r => r.EffectiveTo == null || r.EffectiveTo >= today)
             .ToListAsync();
+
+        if (distributorId is null) return rules;
+
+        var limitedRuleIds = rules.Where(r => r.MaxUsagePerDistributorPerMonth > 0).Select(r => r.Id).ToList();
+        if (limitedRuleIds.Count == 0) return rules;
+
+        var vnNow = DateTimeOffset.UtcNow.ToOffset(TimeSpan.FromHours(7));
+        var usages = await db.PromotionRuleUsages
+            .Where(u => limitedRuleIds.Contains(u.RuleId) && u.DistributorId == distributorId.Value
+                && u.Year == vnNow.Year && u.Month == vnNow.Month)
+            .ToDictionaryAsync(u => u.RuleId, u => u.Count);
+
+        return rules
+            .Where(r => r.MaxUsagePerDistributorPerMonth <= 0
+                || usages.GetValueOrDefault(r.Id, 0) < r.MaxUsagePerDistributorPerMonth)
+            .ToList();
+    }
+
+    /// <summary>Tăng usage count cho 1 rule đã thật sự áp dụng cho 1 NPP — chỉ gọi
+    /// khi đơn hàng CHẮC CHẮN được xác nhận (không gọi ở Price, chỉ preview không
+    /// tính là "đã dùng"). UPDATE atomic qua INSERT ... ON CONFLICT giống
+    /// InventoryService.ApplyAsync — an toàn khi nhiều đơn cùng NPP xác nhận đồng thời.</summary>
+    public static async Task IncrementUsageAsync(DmsDbContext db, int ruleId, int distributorId)
+    {
+        var vnNow = DateTimeOffset.UtcNow.ToOffset(TimeSpan.FromHours(7));
+        var connection = (NpgsqlConnection)db.Database.GetDbConnection();
+        var ownsConnection = connection.State != System.Data.ConnectionState.Open;
+        if (ownsConnection) await connection.OpenAsync();
+
+        try
+        {
+            await using var cmd = connection.CreateCommand();
+            if (db.Database.CurrentTransaction is { } tx)
+                cmd.Transaction = (NpgsqlTransaction)tx.GetDbTransaction();
+
+            cmd.CommandText = """
+                INSERT INTO promotion_rule_usages ("RuleId", "DistributorId", "Year", "Month", "Count")
+                VALUES (@ruleId, @distributorId, @year, @month, 1)
+                ON CONFLICT ("RuleId", "DistributorId", "Year", "Month")
+                DO UPDATE SET "Count" = promotion_rule_usages."Count" + 1
+                """;
+            cmd.Parameters.AddWithValue("ruleId", ruleId);
+            cmd.Parameters.AddWithValue("distributorId", distributorId);
+            cmd.Parameters.AddWithValue("year", vnNow.Year);
+            cmd.Parameters.AddWithValue("month", vnNow.Month);
+            await cmd.ExecuteNonQueryAsync();
+        }
+        finally
+        {
+            if (ownsConnection) await connection.CloseAsync();
+        }
     }
 
     [HttpPost]
@@ -62,6 +118,7 @@ public class PromotionRulesController(DmsDbContext db, AuditLogger audit) : Cont
         rule.FreeUnitsPerProduct = input.FreeUnitsPerProduct;
         rule.EffectiveFrom = input.EffectiveFrom;
         rule.EffectiveTo = input.EffectiveTo;
+        rule.MaxUsagePerDistributorPerMonth = input.MaxUsagePerDistributorPerMonth;
 
         await db.SaveChangesAsync();
         await audit.LogAsync(User, "Update", "PromotionRule", id.ToString(), $"Sửa khuyến mãi '{rule.Name}'");
