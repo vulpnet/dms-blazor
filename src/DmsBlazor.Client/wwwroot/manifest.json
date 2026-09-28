@@ -1,0 +1,16 @@
+{
+  "name": "DMS & Logistics",
+  "short_name": "DMS",
+  "description": "Đặt hàng, tồn kho, vận chuyển, công nợ — cho NVBH, tài xế, thủ kho, kế toán.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f4f6f9",
+  "theme_color": "#1e4fd6",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

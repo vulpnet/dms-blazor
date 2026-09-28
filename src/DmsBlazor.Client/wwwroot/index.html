@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>DMS &amp; Logistics</title>
     <base href="/" />
     <link rel="preload" id="webassembly" />
@@ -13,6 +13,16 @@
     <link rel="stylesheet" href="css/app.css" />
     <link rel="icon" type="image/png" href="favicon.png" />
     <link href="DmsBlazor.Client.styles.css" rel="stylesheet" />
+
+    <!-- PWA — cho phép "Cài đặt ứng dụng" trên điện thoại (Add to Home Screen),
+         chạy toàn màn hình như app thật, không thấy thanh địa chỉ trình duyệt. -->
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#1e4fd6" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="DMS" />
+
     <script type="importmap"></script>
 </head>
 
@@ -31,6 +41,11 @@
         <span class="dismiss">🗙</span>
     </div>
     <script src="js/csvExport.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => navigator.serviceWorker.register('/service-worker.js'));
+        }
+    </script>
     <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
 </body>
 
