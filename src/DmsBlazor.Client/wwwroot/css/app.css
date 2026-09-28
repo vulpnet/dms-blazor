@@ -37,6 +37,11 @@ html, body {
     color: var(--ink);
     font-size: 14px;
     line-height: 1.5;
+    /* Lưới an toàn cuối cùng — bảng dữ liệu rộng hoặc nội dung dài tràn ngang ở 1
+       trang nào đó không được phép khoá cuộn dọc toàn ứng dụng trên mobile. Mỗi
+       nội dung rộng (bảng...) tự cuộn ngang RIÊNG nó (xem .data-table bên dưới),
+       đây chỉ là chặn cuối cùng nếu có chỗ nào lỡ tràn. */
+    overflow-x: hidden;
 }
 
 h1, h2, h3, h4 {
@@ -236,6 +241,11 @@ code {
     background: var(--surface);
     box-shadow: var(--shadow-sm);
     margin-bottom: 1.25rem;
+    /* Bảng dữ liệu nhiều cột rộng hơn màn hình điện thoại tự cuộn ngang TRONG
+       card này — không kéo giãn cả trang, tránh khoá cuộn dọc toàn ứng dụng
+       trên mobile. Đặt trực tiếp ở .card (không chỉ khi :has(.data-table)) để
+       chắc chắn hoạt động trên mọi trình duyệt, kể cả bản cũ chưa hỗ trợ :has(). */
+    overflow-x: auto;
 }
 .card h3, .card h4 {
     font-size: 0.98rem;
@@ -244,6 +254,7 @@ code {
 
 .data-table {
     width: 100%;
+    min-width: 560px;
     border-collapse: collapse;
     font-size: 0.87rem;
 }
