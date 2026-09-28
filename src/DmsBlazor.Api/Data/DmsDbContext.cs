@@ -20,6 +20,7 @@ public class DmsDbContext(DbContextOptions<DmsDbContext> options) : DbContext(op
     public DbSet<Warehouse> Warehouses => Set<Warehouse>();
     public DbSet<InventoryStock> InventoryStocks => Set<InventoryStock>();
     public DbSet<InventoryTransaction> InventoryTransactions => Set<InventoryTransaction>();
+    public DbSet<InventoryBatch> InventoryBatches => Set<InventoryBatch>();
     public DbSet<DistributorPayment> DistributorPayments => Set<DistributorPayment>();
     public DbSet<User> Users => Set<User>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
@@ -192,6 +193,21 @@ public class DmsDbContext(DbContextOptions<DmsDbContext> options) : DbContext(op
             e.Property(x => x.ProductName).HasMaxLength(200);
             e.Property(x => x.Note).HasMaxLength(500);
             e.Property(x => x.RefCode).HasMaxLength(30);
+        });
+
+        modelBuilder.Entity<InventoryBatch>(e =>
+        {
+            e.ToTable("inventory_batches");
+            e.Property(x => x.WarehouseName).HasMaxLength(200);
+            e.Property(x => x.ProductCode).HasMaxLength(50);
+            e.Property(x => x.ProductName).HasMaxLength(200);
+            e.Property(x => x.Unit).HasMaxLength(30);
+            e.Property(x => x.BatchCode).HasMaxLength(50).IsRequired();
+            // 1 lô = 1 dòng duy nhất/(kho, sản phẩm, mã lô) — atomic UPDATE cộng dồn
+            // Quantity qua INSERT ... ON CONFLICT giống InventoryStock.
+            e.HasIndex(x => new { x.WarehouseId, x.ProductId, x.BatchCode }).IsUnique();
+            // Truy vấn phổ biến: sắp xếp lô sắp hết hạn trước (cảnh báo hết hạn, mục kế tiếp).
+            e.HasIndex(x => x.ExpiryDate);
         });
 
         modelBuilder.Entity<User>(e =>

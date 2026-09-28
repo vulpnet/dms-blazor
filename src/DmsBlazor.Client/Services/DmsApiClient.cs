@@ -360,6 +360,15 @@ public class DmsApiClient(HttpClient http)
         return (false, await res.Content.ReadAsStringAsync());
     }
 
+    public Task<List<InventoryBatch>?> GetInventoryBatchesAsync(int? warehouseId = null, int? productId = null)
+    {
+        var query = new List<string>();
+        if (warehouseId.HasValue) query.Add($"warehouseId={warehouseId}");
+        if (productId.HasValue) query.Add($"productId={productId}");
+        var qs = query.Count > 0 ? "?" + string.Join("&", query) : "";
+        return http.GetFromJsonAsync<List<InventoryBatch>>($"api/inventory/batches{qs}");
+    }
+
     public async Task<(bool Success, string? Error)> AdjustStockAsync(AdjustStockRequest request)
     {
         var res = await http.PostAsJsonAsync("api/inventory/adjust", request);

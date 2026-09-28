@@ -102,6 +102,51 @@ public static class InventoryService
         }
     }
 
+    /// <summary>Cộng dồn số lượng vào 1 lô hàng cụ thể (theo mã lô) — SONG SONG với
+    /// InventoryStock (tổng chung), KHÔNG thay thế. Chỉ gọi khi StockInRequest có
+    /// BatchCode (ngành hàng cần theo dõi hạn dùng); gọi bên trong transaction đã mở
+    /// bởi ApplyAsync để 2 UPDATE (tổng chung + lô) all-or-nothing cùng nhau — một lô
+    /// ghi được mà tổng chung không ghi (hoặc ngược lại) sẽ làm 2 nguồn dữ liệu lệch
+    /// nhau, không cách nào phát hiện qua kiểm tra thông thường.</summary>
+    public static async Task ApplyBatchAsync(
+        DmsDbContext db, int warehouseId, int productId, string batchCode, int quantityChange, DateOnly? expiryDate)
+    {
+        if (db.Database.CurrentTransaction is null)
+            throw new InvalidOperationException("ApplyBatchAsync phải gọi bên trong 1 transaction đang mở (cùng với ApplyAsync).");
+
+        var warehouse = await db.Warehouses.FindAsync(warehouseId)
+            ?? throw new InvalidOperationException($"Không tìm thấy kho id={warehouseId}.");
+        var product = await db.Products.FindAsync(productId)
+            ?? throw new InvalidOperationException($"Không tìm thấy sản phẩm id={productId}.");
+
+        var connection = (NpgsqlConnection)db.Database.GetDbConnection();
+        await using var cmd = connection.CreateCommand();
+        cmd.Transaction = (NpgsqlTransaction)db.Database.CurrentTransaction.GetDbTransaction();
+        // ExpiryDate chỉ ghi đè khi giá trị mới khác NULL — nhập bổ sung cùng lô lần
+        // sau (không kèm hạn dùng) không được xoá mất hạn dùng đã ghi từ lần nhập đầu.
+        cmd.CommandText = """
+            INSERT INTO inventory_batches
+                ("WarehouseId", "WarehouseName", "ProductId", "ProductCode", "ProductName", "Emoji", "Unit", "BatchCode", "ExpiryDate", "Quantity", "CreatedAt")
+            VALUES (@warehouseId, @warehouseName, @productId, @productCode, @productName, @emoji, @unit, @batchCode, @expiryDate, @quantityChange, @createdAt)
+            ON CONFLICT ("WarehouseId", "ProductId", "BatchCode")
+            DO UPDATE SET
+                "Quantity" = inventory_batches."Quantity" + EXCLUDED."Quantity",
+                "ExpiryDate" = COALESCE(EXCLUDED."ExpiryDate", inventory_batches."ExpiryDate")
+            """;
+        cmd.Parameters.AddWithValue("warehouseId", warehouseId);
+        cmd.Parameters.AddWithValue("warehouseName", warehouse.Name);
+        cmd.Parameters.AddWithValue("productId", productId);
+        cmd.Parameters.AddWithValue("productCode", product.Code);
+        cmd.Parameters.AddWithValue("productName", product.Name);
+        cmd.Parameters.AddWithValue("emoji", product.Emoji);
+        cmd.Parameters.AddWithValue("unit", product.Unit);
+        cmd.Parameters.AddWithValue("batchCode", batchCode);
+        cmd.Parameters.AddWithValue("expiryDate", (object?)expiryDate ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("quantityChange", quantityChange);
+        cmd.Parameters.AddWithValue("createdAt", DateTimeOffset.UtcNow);
+        await cmd.ExecuteNonQueryAsync();
+    }
+
     /// <summary>Lấy hoặc tạo kho của 1 NPP — gọi khi cần trừ/cộng tồn cho NPP chưa
     /// từng có kho riêng (vd lần đầu nhận hàng).</summary>
     public static async Task<Warehouse> GetOrCreateDistributorWarehouseAsync(DmsDbContext db, int distributorId)

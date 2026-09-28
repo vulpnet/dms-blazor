@@ -99,6 +99,17 @@ public class InventoryController(DmsDbContext db) : ControllerBase
         return result;
     }
 
+    // Danh sách lô còn tồn (Quantity > 0) — Quantity = 0 không xoá dòng (giữ lịch sử
+    // đã từng nhập lô này), chỉ ẩn khỏi màn hình xem vì không còn ý nghĩa vận hành.
+    [HttpGet("batches")]
+    public async Task<ActionResult<List<InventoryBatch>>> GetBatches([FromQuery] int? warehouseId = null, [FromQuery] int? productId = null)
+    {
+        var query = db.InventoryBatches.Where(b => b.Quantity > 0);
+        if (warehouseId.HasValue) query = query.Where(b => b.WarehouseId == warehouseId.Value);
+        if (productId.HasValue) query = query.Where(b => b.ProductId == productId.Value);
+        return await query.OrderBy(b => b.ExpiryDate).ThenBy(b => b.ProductName).ToListAsync();
+    }
+
     [HttpGet("transactions")]
     public async Task<ActionResult<List<InventoryTransaction>>> GetTransactions(
         [FromQuery] int? warehouseId = null, [FromQuery] int? productId = null)
@@ -115,11 +126,37 @@ public class InventoryController(DmsDbContext db) : ControllerBase
     public async Task<IActionResult> StockIn([FromBody] StockInRequest request)
     {
         if (request.Quantity <= 0) return BadRequest("Số lượng nhập phải lớn hơn 0.");
+        if (!string.IsNullOrWhiteSpace(request.BatchCode) && request.BatchCode.Trim().Length > 50)
+            return BadRequest("Mã lô không được dài quá 50 ký tự.");
 
-        // ApplyAsync tự mở transaction + SaveChangesAsync + commit riêng khi gọi
-        // độc lập thế này (không có transaction bao ngoài) — không cần gọi thêm.
-        await InventoryService.ApplyAsync(db, request.WarehouseId, request.ProductId,
-            request.Quantity, InventoryTransactionType.StockIn, request.Note);
+        var batchCode = request.BatchCode?.Trim();
+        if (string.IsNullOrEmpty(batchCode))
+        {
+            // Không theo dõi lô — giữ nguyên hành vi cũ, ApplyAsync tự mở transaction
+            // + commit riêng khi gọi độc lập (không có transaction bao ngoài).
+            await InventoryService.ApplyAsync(db, request.WarehouseId, request.ProductId,
+                request.Quantity, InventoryTransactionType.StockIn, request.Note);
+            return NoContent();
+        }
+
+        // Có theo dõi lô — bọc rõ ràng 1 transaction chung cho cả 2 UPDATE (tổng
+        // chung + lô cụ thể), all-or-nothing để không bao giờ lệch giữa 2 nguồn.
+        await using var transaction = await db.Database.BeginTransactionAsync();
+        try
+        {
+            await InventoryService.ApplyAsync(db, request.WarehouseId, request.ProductId,
+                request.Quantity, InventoryTransactionType.StockIn, request.Note);
+            await InventoryService.ApplyBatchAsync(db, request.WarehouseId, request.ProductId,
+                batchCode, request.Quantity, request.ExpiryDate);
+
+            await db.SaveChangesAsync();
+            await transaction.CommitAsync();
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
 
         return NoContent();
     }

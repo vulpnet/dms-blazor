@@ -24,7 +24,7 @@ Hiện tại: chiết khấu bậc thang cố định 2 mức (≥50 → 5%, ≥
 
 Hiện tại: atomic UPDATE cộng/trừ tồn kho qua Postgres, không phân biệt lô hàng, không FIFO/FEFO, không cảnh báo hết hạn.
 
-- [ ] **Quản lý theo lô (batch/lot)** — hiện `InventoryStock` chỉ có tổng số lượng theo (kho, sản phẩm), không biết lô nào nhập ngày nào, hạn dùng khi nào. Cần thêm `InventoryBatch` nếu ngành hàng có hạn sử dụng (FMCG, thực phẩm).
+- [x] **Quản lý theo lô (batch/lot)** — Bảng `inventory_batches` mới, SONG SONG với `InventoryStock` (không thay thế) — mỗi lô 1 dòng theo (kho, sản phẩm, mã lô), atomic UPDATE cộng dồn qua `InventoryService.ApplyBatchAsync` giống `ApplyAsync`. `StockInRequest` thêm `BatchCode`/`ExpiryDate` tuỳ chọn — bỏ trống thì hành vi y hệt trước đây. Tab "Lô hàng" mới ở trang Tồn kho, tô cảnh báo lô sắp hết hạn (≤30 ngày). Chưa dùng để xuất theo FEFO (mục kế tiếp). (2026-09-28)
 - [ ] **Xuất kho theo FEFO (First-Expired-First-Out)** — khi xác nhận đơn/giao hàng, tự động chọn lô sắp hết hạn trước thay vì trừ tổng không phân biệt lô — phụ thuộc mục trên.
 - [ ] **Cảnh báo hàng sắp hết hạn** — mở rộng từ cảnh báo tồn thấp đã có (`LowStockAlert`) sang cảnh báo theo hạn dùng.
 - [ ] **Chuyển kho nội bộ có duyệt** — hiện tại chuyển tồn kho giữa các kho chỉ xảy ra gián tiếp qua đơn hàng/giao hàng, chưa có nghiệp vụ "chuyển kho A sang kho B" độc lập kèm duyệt của Thủ kho.

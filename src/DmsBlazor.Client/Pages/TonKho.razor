@@ -28,6 +28,7 @@ else
 {
     <div class="tabs" role="tablist">
         <button role="tab" aria-selected="@(activeTab == "stocks")" class="@(activeTab == "stocks" ? "tab active" : "tab")" @onclick='() => SetTab("stocks")'>Tồn kho</button>
+        <button role="tab" aria-selected="@(activeTab == "batches")" class="@(activeTab == "batches" ? "tab active" : "tab")" @onclick='() => SetTab("batches")'>📦 Lô hàng</button>
         <button role="tab" aria-selected="@(activeTab == "low-stock")" class="@(activeTab == "low-stock" ? "tab active" : "tab")" @onclick='() => SetTab("low-stock")'>⚠️ Tồn thấp</button>
         <button role="tab" aria-selected="@(activeTab == "reorder")" class="@(activeTab == "reorder" ? "tab active" : "tab")" @onclick='() => SetTab("reorder")'>📈 Gợi ý đặt lại</button>
     </div>
@@ -86,6 +87,57 @@ else
                     </tbody>
                 </table>
             </div>
+        }
+    }
+    else if (activeTab == "batches")
+    {
+        @if (batches is null)
+        {
+            <div class="skeleton-row"><div class="skeleton-card"></div></div>
+        }
+        else if (batches.Count == 0)
+        {
+            <p class="muted">Chưa có lô hàng nào được theo dõi — điền "Mã lô" khi nhập hàng để bắt đầu theo dõi hạn dùng.</p>
+        }
+        else
+        {
+            <div class="filter-bar">
+                <input class="filter-search" @bind="batchSearchText" @bind:event="oninput" placeholder="Tìm theo mã lô, tên sản phẩm, kho..." />
+            </div>
+
+            @if (FilteredBatches.Count == 0)
+            {
+                <p class="muted">Không có lô nào khớp bộ lọc.</p>
+            }
+            else
+            {
+                <div class="card">
+                    <table class="data-table">
+                        <thead>
+                            <tr><th></th><th>Mã lô</th><th>Sản phẩm</th><th>Kho</th><th class="text-right">Còn lại</th><th>Hạn dùng</th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var b in FilteredBatches)
+                            {
+                                <tr class="@(IsExpiringSoon(b.ExpiryDate) ? "row-expiring" : "")">
+                                    <td>@b.Emoji</td>
+                                    <td><code>@b.BatchCode</code></td>
+                                    <td>@b.ProductName</td>
+                                    <td>@b.WarehouseName</td>
+                                    <td class="text-right">@b.Quantity.ToString("N0") @b.Unit</td>
+                                    <td>
+                                        @(b.ExpiryDate?.ToString("dd/MM/yyyy") ?? "—")
+                                        @if (IsExpiringSoon(b.ExpiryDate))
+                                        {
+                                            <span class="channel-badge warning">Sắp hết hạn</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
         }
     }
     else if (activeTab == "low-stock")
@@ -213,6 +265,19 @@ else
                 <input id="in-note" @bind="formNote" placeholder="vd: Nhập theo PO-2026-014" />
             </div>
 
+            <p class="muted batch-hint">Theo dõi lô/hạn dùng (tuỳ chọn) — chỉ cần với ngành hàng có hạn sử dụng.</p>
+            <div class="field">
+                <label for="in-batchcode">Mã lô (bỏ trống nếu không theo dõi lô)</label>
+                <input id="in-batchcode" @bind="formBatchCode" placeholder="vd: LOT-2026-09-001" />
+            </div>
+            @if (!string.IsNullOrWhiteSpace(formBatchCode))
+            {
+                <div class="field">
+                    <label for="in-expiry">Hạn sử dụng (tuỳ chọn)</label>
+                    <input id="in-expiry" type="date" @bind="formExpiryDate" />
+                </div>
+            }
+
             @if (formError is not null)
             {
                 <div class="alert-error">@formError</div>
@@ -318,16 +383,22 @@ else
     }
     .modal-panel h3 { font-size: 1.05rem; margin-bottom: 0.75rem; }
     .modal-actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 1.25rem; }
+    .batch-hint { margin: 0.5rem 0 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--line); }
+    .row-expiring { background: var(--warning-soft); }
+    .channel-badge { font-size: 0.75rem; font-weight: 650; padding: 0.2rem 0.55rem; border-radius: 999px; margin-left: 0.4rem; }
+    .channel-badge.warning { background: var(--warning-soft); color: var(--warning); }
 </style>
 
 @code {
     private List<Warehouse>? warehouses;
     private List<Product>? products;
     private List<InventoryStock>? stocks;
+    private List<InventoryBatch>? batches;
     private List<LowStockAlert>? lowStockAlerts;
     private List<ReorderSuggestion>? reorderSuggestions;
     private int selectedWarehouseId;
     private string searchText = "";
+    private string batchSearchText = "";
     private string lowStockSearchText = "";
     private string reorderSearchText = "";
     private string activeTab = "stocks";
@@ -338,6 +409,8 @@ else
     private int formProductId;
     private int formQuantity = 1;
     private string formNote = "";
+    private string formBatchCode = "";
+    private DateTime? formExpiryDate;
     private string? formError;
     private bool saving;
 
@@ -358,6 +431,18 @@ else
             || r.ProductName.Contains(reorderSearchText, StringComparison.OrdinalIgnoreCase)
             || r.WarehouseName.Contains(reorderSearchText, StringComparison.OrdinalIgnoreCase))
         .ToList();
+
+    private List<InventoryBatch> FilteredBatches => (batches ?? [])
+        .Where(b => string.IsNullOrWhiteSpace(batchSearchText)
+            || b.BatchCode.Contains(batchSearchText, StringComparison.OrdinalIgnoreCase)
+            || b.ProductName.Contains(batchSearchText, StringComparison.OrdinalIgnoreCase)
+            || b.WarehouseName.Contains(batchSearchText, StringComparison.OrdinalIgnoreCase))
+        .ToList();
+
+    // Sắp hết hạn = còn <= 30 ngày — chỉ để tô màu cảnh báo trực quan trong tab này;
+    // cảnh báo hết hạn chủ động (thông báo, tách khỏi tồn thấp) là mục riêng kế tiếp.
+    private static bool IsExpiringSoon(DateOnly? expiryDate) =>
+        expiryDate is { } d && d <= DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30);
 
     protected override async Task OnInitializedAsync()
     {
@@ -418,6 +503,7 @@ else
     private async Task SetTab(string tab)
     {
         activeTab = tab;
+        if (tab == "batches" && batches is null) batches = await Api.GetInventoryBatchesAsync();
         if (tab == "low-stock" && lowStockAlerts is null) lowStockAlerts = await Api.GetLowStockAsync();
         if (tab == "reorder" && reorderSuggestions is null) reorderSuggestions = await Api.GetReorderSuggestionsAsync();
     }
@@ -429,6 +515,8 @@ else
         formProductId = products?.FirstOrDefault()?.Id ?? 0;
         formQuantity = 1;
         formNote = "";
+        formBatchCode = "";
+        formExpiryDate = null;
         showStockInForm = true;
     }
 
@@ -457,7 +545,9 @@ else
             WarehouseId = formWarehouseId,
             ProductId = formProductId,
             Quantity = formQuantity,
-            Note = formNote
+            Note = formNote,
+            BatchCode = string.IsNullOrWhiteSpace(formBatchCode) ? null : formBatchCode.Trim(),
+            ExpiryDate = formExpiryDate is { } d ? DateOnly.FromDateTime(d) : null
         });
         saving = false;
 
@@ -469,6 +559,7 @@ else
 
         showStockInForm = false;
         await LoadStocks();
+        batches = null; // ép tải lại lần sau vào tab Lô hàng, tránh hiện dữ liệu cũ
     }
 
     private async Task SubmitAdjust()

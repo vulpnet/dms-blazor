@@ -64,6 +64,34 @@ public class StockInRequest
     public int ProductId { get; set; }
     public int Quantity { get; set; } // luôn dương
     public string? Note { get; set; }
+
+    // Tuỳ chọn — chỉ điền khi ngành hàng cần theo dõi hạn dùng (FMCG, thực phẩm).
+    // Để trống nghĩa là nhập hàng không cần biết lô/hạn dùng, InventoryStock.Quantity
+    // (tổng chung) vẫn cộng đúng như trước — batch chỉ là lớp thông tin bổ sung song
+    // song, KHÔNG thay thế cơ chế tổng số lượng hiện có.
+    public string? BatchCode { get; set; }
+    public DateOnly? ExpiryDate { get; set; }
+}
+
+/// <summary>1 lô hàng nhập — biết chính xác lô nào nhập ngày nào, hạn dùng khi nào,
+/// còn lại bao nhiêu. Song song với InventoryStock (tổng chung theo Warehouse+Product,
+/// không đổi cách tính) — Quantity ở đây là tổng RIÊNG của lô này, cộng dồn các lô
+/// cùng (WarehouseId, ProductId, BatchCode) lại phải bằng InventoryStock.Quantity.
+/// Chưa dùng để xuất theo FEFO (mục riêng) — hiện chỉ để biết lô nào sắp hết hạn.</summary>
+public class InventoryBatch
+{
+    public int Id { get; set; }
+    public int WarehouseId { get; set; }
+    public string WarehouseName { get; set; } = "";
+    public int ProductId { get; set; }
+    public string ProductCode { get; set; } = "";
+    public string ProductName { get; set; } = "";
+    public string Emoji { get; set; } = "";
+    public string Unit { get; set; } = "";
+    public string BatchCode { get; set; } = "";
+    public DateOnly? ExpiryDate { get; set; }
+    public int Quantity { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
 }
 
 /// <summary>Điều chỉnh tồn kho về đúng SỐ LƯỢNG THỰC TẾ sau kiểm kho — API tự tính
