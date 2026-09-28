@@ -227,6 +227,24 @@ public class DmsApiClient(HttpClient http)
     public Task<List<DistributorDiscountHistory>?> GetDistributorDiscountHistoryAsync(int id) =>
         http.GetFromJsonAsync<List<DistributorDiscountHistory>>($"api/distributors/{id}/discount-history");
 
+    // ===== Giá hợp đồng riêng theo NPP =====
+
+    public Task<List<DistributorProductPrice>?> GetDistributorProductPricesAsync(int distributorId) =>
+        http.GetFromJsonAsync<List<DistributorProductPrice>>($"api/distributorproductprices/{distributorId}");
+
+    public async Task<(bool Success, string? Error)> CreateDistributorProductPriceAsync(DistributorProductPrice price)
+    {
+        var res = await http.PostAsJsonAsync("api/distributorproductprices", price);
+        if (res.IsSuccessStatusCode) return (true, null);
+        return (false, await res.Content.ReadAsStringAsync());
+    }
+
+    public async Task<bool> DeleteDistributorProductPriceAsync(int id)
+    {
+        var res = await http.DeleteAsync($"api/distributorproductprices/{id}");
+        return res.IsSuccessStatusCode;
+    }
+
     // ===== Khuyến mãi (cấu hình động) =====
 
     public Task<List<PromotionRule>?> GetPromotionRulesAsync() =>

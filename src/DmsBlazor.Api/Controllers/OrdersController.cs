@@ -20,7 +20,8 @@ public class OrdersController(DmsDbContext db, AuditLogger audit) : ControllerBa
         var products = await db.Products.Where(p => p.IsActive).ToListAsync();
         var distributor = await GetDistributorAsync(request);
         var activeRules = await PromotionRulesController.GetActiveRulesAsync(db, distributor?.Id);
-        var priced = OrderPricingService.Price(request.Lines, products, request.Channel, distributor?.ExtraDiscountPercent ?? 0, activeRules);
+        var contractPrices = await DistributorProductPricesController.GetContractPricesAsync(db, distributor?.Id);
+        var priced = OrderPricingService.Price(request.Lines, products, request.Channel, distributor?.ExtraDiscountPercent ?? 0, activeRules, contractPrices);
         await AttachDebtWarningAsync(priced, distributor);
         return priced;
     }
@@ -58,7 +59,8 @@ public class OrdersController(DmsDbContext db, AuditLogger audit) : ControllerBa
         var products = await db.Products.Where(p => p.IsActive).ToListAsync();
         var distributor = await GetDistributorAsync(request);
         var activeRules = await PromotionRulesController.GetActiveRulesAsync(db, distributor?.Id);
-        var priced = OrderPricingService.Price(request.Lines, products, request.Channel, distributor?.ExtraDiscountPercent ?? 0, activeRules);
+        var contractPrices = await DistributorProductPricesController.GetContractPricesAsync(db, distributor?.Id);
+        var priced = OrderPricingService.Price(request.Lines, products, request.Channel, distributor?.ExtraDiscountPercent ?? 0, activeRules, contractPrices);
 
         if (priced.Lines.Count == 0)
             return BadRequest("Đơn hàng không có sản phẩm nào.");
@@ -224,7 +226,8 @@ public class OrdersController(DmsDbContext db, AuditLogger audit) : ControllerBa
 
         var products = await db.Products.ToListAsync(); // cho sửa cả sản phẩm đã ngừng bán nếu đã có sẵn trong đơn cũ
         var activeRules = await PromotionRulesController.GetActiveRulesAsync(db, order.DistributorId);
-        var priced = OrderPricingService.Price(request.Lines, products, order.Channel, activeRules: activeRules);
+        var contractPrices = await DistributorProductPricesController.GetContractPricesAsync(db, order.DistributorId);
+        var priced = OrderPricingService.Price(request.Lines, products, order.Channel, activeRules: activeRules, contractPrices: contractPrices);
 
         if (priced.Lines.Count == 0)
             return BadRequest("Đơn hàng phải có ít nhất 1 sản phẩm.");

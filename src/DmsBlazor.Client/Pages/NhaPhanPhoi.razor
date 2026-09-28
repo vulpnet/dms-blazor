@@ -69,6 +69,7 @@ else
                         <td class="row-actions">
                             <button class="btn-link" @onclick="() => OpenEditForm(d)">Sửa</button>
                             <button class="btn-link" @onclick="() => OpenDiscountHistory(d)">Lịch sử chiết khấu</button>
+                            <button class="btn-link" @onclick="() => OpenContractPrices(d)">Giá hợp đồng</button>
                             <button class="btn-link danger" @onclick="() => ConfirmDelete(d)">Xoá</button>
                         </td>
                     </tr>
@@ -178,6 +179,73 @@ else
     </div>
 }
 
+@if (viewingContractPricesFor is not null)
+{
+    <div class="modal-backdrop" @onclick="CloseContractPrices">
+        <div class="modal-panel modal-panel-lg" @onclick:stopPropagation="true">
+            <h3>Giá hợp đồng riêng — @viewingContractPricesFor.Name</h3>
+            <p class="muted">Giá thùng riêng cho NPP này — vẫn cộng thêm chiết khấu bậc thang/combo/khuyến mãi như bình thường lên trên giá đã ghi đè.</p>
+
+            @if (allProducts is null || contractPrices is null)
+            {
+                <p class="muted">Đang tải...</p>
+            }
+            else
+            {
+                @if (contractPrices.Count > 0)
+                {
+                    <ul class="history-list">
+                        @foreach (var cp in contractPrices)
+                        {
+                            var product = allProducts.FirstOrDefault(p => p.Id == cp.ProductId);
+                            <li>
+                                <div>@(product?.Name ?? $"Sản phẩm #{cp.ProductId}") <span class="muted">(gốc @product?.PricePerCase.ToString("N0")k)</span></div>
+                                <div>
+                                    <b>@cp.PricePerCase.ToString("N0")k</b>
+                                    <button class="btn-link danger" @onclick="() => DeleteContractPrice(cp)">Xoá</button>
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                }
+                else
+                {
+                    <p class="muted">Chưa có giá hợp đồng riêng nào.</p>
+                }
+
+                <div class="field-row contract-add-row">
+                    <div class="field">
+                        <label for="cp-product">Sản phẩm</label>
+                        <select id="cp-product" @bind="newContractProductId">
+                            @foreach (var p in allProducts.Where(p => !contractPrices.Any(cp => cp.ProductId == p.Id)))
+                            {
+                                <option value="@p.Id">@p.Name (gốc @p.PricePerCase.ToString("N0")k)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="cp-price">Giá hợp đồng (nghìn đ/thùng)</label>
+                        <input id="cp-price" type="number" min="1" @bind="newContractPrice" />
+                    </div>
+                </div>
+
+                @if (contractPriceError is not null)
+                {
+                    <div class="alert-error">@contractPriceError</div>
+                }
+
+                <div class="modal-actions">
+                    <button class="btn-outline" @onclick="AddContractPrice" disabled="@(newContractProductId == 0)">+ Thêm giá hợp đồng</button>
+                </div>
+            }
+
+            <div class="modal-actions">
+                <button class="btn-outline" @onclick="CloseContractPrices">Đóng</button>
+            </div>
+        </div>
+    </div>
+}
+
 @if (confirmingDelete is not null)
 {
     <div class="modal-backdrop" @onclick="() => confirmingDelete = null">
@@ -226,6 +294,8 @@ else
         box-shadow: var(--shadow-md);
     }
     .modal-panel-sm { max-width: 380px; }
+    .modal-panel-lg { max-width: 560px; }
+    .contract-add-row { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--line); }
     .modal-panel h3 { font-size: 1.05rem; margin-bottom: 1rem; }
     .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem; }
     .field { margin-bottom: 1rem; }
@@ -268,6 +338,13 @@ else
 
     private Distributor? viewingHistoryFor;
     private List<DistributorDiscountHistory>? discountHistory;
+
+    private Distributor? viewingContractPricesFor;
+    private List<Product>? allProducts;
+    private List<DistributorProductPrice>? contractPrices;
+    private int newContractProductId;
+    private decimal newContractPrice = 1;
+    private string? contractPriceError;
 
     private List<Distributor> FilteredDistributors => (distributors ?? [])
         .Where(d => string.IsNullOrWhiteSpace(searchText)
@@ -376,6 +453,56 @@ else
         viewingHistoryFor = d;
         discountHistory = null;
         discountHistory = await Api.GetDistributorDiscountHistoryAsync(d.Id);
+    }
+
+    private async Task OpenContractPrices(Distributor d)
+    {
+        viewingContractPricesFor = d;
+        contractPriceError = null;
+        contractPrices = null;
+        allProducts ??= await Api.GetManagedProductsAsync();
+        contractPrices = await Api.GetDistributorProductPricesAsync(d.Id);
+        newContractProductId = allProducts?.FirstOrDefault(p => contractPrices?.Any(cp => cp.ProductId == p.Id) != true)?.Id ?? 0;
+        newContractPrice = 1;
+    }
+
+    private void CloseContractPrices() => viewingContractPricesFor = null;
+
+    private async Task AddContractPrice()
+    {
+        if (viewingContractPricesFor is null || newContractProductId == 0) return;
+        contractPriceError = null;
+
+        if (newContractPrice <= 0)
+        {
+            contractPriceError = "Giá hợp đồng phải lớn hơn 0.";
+            return;
+        }
+
+        var (success, error) = await Api.CreateDistributorProductPriceAsync(new DistributorProductPrice
+        {
+            DistributorId = viewingContractPricesFor.Id,
+            ProductId = newContractProductId,
+            PricePerCase = newContractPrice
+        });
+
+        if (!success)
+        {
+            contractPriceError = error ?? "Không thể thêm giá hợp đồng.";
+            return;
+        }
+
+        contractPrices = await Api.GetDistributorProductPricesAsync(viewingContractPricesFor.Id);
+        newContractProductId = allProducts?.FirstOrDefault(p => contractPrices?.Any(cp => cp.ProductId == p.Id) != true)?.Id ?? 0;
+        newContractPrice = 1;
+    }
+
+    private async Task DeleteContractPrice(DistributorProductPrice cp)
+    {
+        if (viewingContractPricesFor is null) return;
+        await Api.DeleteDistributorProductPriceAsync(cp.Id);
+        contractPrices = await Api.GetDistributorProductPricesAsync(viewingContractPricesFor.Id);
+        newContractProductId = allProducts?.FirstOrDefault(p => contractPrices?.Any(x => x.ProductId == p.Id) != true)?.Id ?? 0;
     }
 
     private void ConfirmDelete(Distributor d) => confirmingDelete = d;

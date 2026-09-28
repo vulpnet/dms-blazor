@@ -95,7 +95,11 @@ else
                 @if (selectedProductPrice is not null)
                 {
                     <p class="picker-hint">
-                        Đơn giá: <b>@selectedProductPrice.Value.ToString("N0")k</b> / @selectedProductUnitLabel
+                        Đơn giá niêm yết: <b>@selectedProductPrice.Value.ToString("N0")k</b> / @selectedProductUnitLabel
+                        @if (channel == SalesChannel.Npp && SelectedDistributor.DistributorId is not null)
+                        {
+                            <span> — giá thực tế cho NPP này hiện đúng trong giỏ hàng sau khi thêm (có thể khác nếu có giá hợp đồng riêng).</span>
+                        }
                     </p>
                 }
             </div>

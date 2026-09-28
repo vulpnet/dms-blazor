@@ -161,6 +161,37 @@ public class OrderPricingServiceTests
     }
 
     [Fact]
+    public void GiaHopDongNPP_ThayDonGiaGoc_VanCongThemChietKhauBacThang()
+    {
+        // Giá gốc Cola PricePerCase=168, hợp đồng riêng NPP giá 140 -> subtotal tính
+        // theo 140, không phải 168. Vẫn cộng chiết khấu bậc thang bình thường lên trên.
+        var contractPrices = new Dictionary<int, decimal> { [1] = 140 };
+
+        var result = OrderPricingService.Price(
+            [new OrderLineInput { ProductId = 1, Qty = 60 }], Catalog, SalesChannel.Npp,
+            contractPrices: contractPrices);
+
+        Assert.Equal(140m, result.Lines[0].UnitPrice);
+        Assert.Equal(8400m, result.Subtotal); // 60 * 140
+        Assert.Equal("tier1", result.AppliedTier); // vẫn đạt tier1 vì Qty=60 không đổi
+        Assert.Equal(5m, result.Lines[0].LineDiscountPercent);
+        Assert.Equal(420m, result.Lines[0].LineDiscountAmount); // 8400 * 5%
+    }
+
+    [Fact]
+    public void GiaHopDongNPP_KhongApDungKenhRetail()
+    {
+        var contractPrices = new Dictionary<int, decimal> { [1] = 140 };
+
+        var result = OrderPricingService.Price(
+            [new OrderLineInput { ProductId = 1, Qty = 5 }], Catalog, SalesChannel.Retail,
+            contractPrices: contractPrices);
+
+        // Retail luôn dùng PricePerUnit gốc, bỏ qua contractPrices dù có truyền vào.
+        Assert.Equal(8m, result.Lines[0].UnitPrice);
+    }
+
+    [Fact]
     public void SanPham_ExtraDiscountPercentRieng_ChiCongThemDongDo()
     {
         // Hàng tồn kho lâu, giảm thêm riêng sản phẩm này ngoài chiết khấu bậc thang chung.

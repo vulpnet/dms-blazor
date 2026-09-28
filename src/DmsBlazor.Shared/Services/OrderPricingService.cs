@@ -19,6 +19,11 @@ namespace DmsBlazor.Shared.Services;
 /// Product.DiscountEligible=false luôn 0%, dòng có Product.ExtraDiscountPercent được
 /// cộng thêm riêng dòng đó. PricedOrder.DiscountPercent/Amount vẫn giữ nghĩa "gộp
 /// toàn đơn" (tổng LineDiscountAmount / subtotal) để không phá UI hiển thị hiện có.
+///
+/// Từ 2026-09-28: contractPrices (ProductId -> giá thùng riêng theo hợp đồng NPP) chỉ
+/// THAY ĐƠN GIÁ GỐC, không phải giá cuối cùng — chiết khấu bậc thang/combo/
+/// ExtraDiscountPercent vẫn cộng thêm bình thường lên trên giá này. Chỉ có ý nghĩa
+/// ở kênh NPP; Retail bỏ qua vì giá hợp đồng chỉ đàm phán theo NPP.
 /// </summary>
 public static class OrderPricingService
 {
@@ -31,14 +36,19 @@ public static class OrderPricingService
 
     public static PricedOrder Price(
         IEnumerable<OrderLineInput> cart, IReadOnlyList<Product> catalog, SalesChannel channel,
-        decimal extraDiscountPercent = 0, IReadOnlyList<PromotionRule>? activeRules = null)
+        decimal extraDiscountPercent = 0, IReadOnlyList<PromotionRule>? activeRules = null,
+        IReadOnlyDictionary<int, decimal>? contractPrices = null)
     {
         var lines = cart
             .Where(c => c.Qty > 0)
             .Select(c =>
             {
                 var product = catalog.First(p => p.Id == c.ProductId);
-                var unitPrice = channel == SalesChannel.Npp ? product.PricePerCase : product.PricePerUnit;
+                var unitPrice = channel == SalesChannel.Npp
+                    ? (contractPrices?.GetValueOrDefault(c.ProductId) is { } contractPrice && contractPrice > 0
+                        ? contractPrice
+                        : product.PricePerCase)
+                    : product.PricePerUnit;
                 return new PricedOrderLine
                 {
                     Product = product,

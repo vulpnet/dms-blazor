@@ -26,6 +26,7 @@ public class DmsDbContext(DbContextOptions<DmsDbContext> options) : DbContext(op
     public DbSet<DistributorDiscountHistory> DistributorDiscountHistories => Set<DistributorDiscountHistory>();
     public DbSet<PromotionRule> PromotionRules => Set<PromotionRule>();
     public DbSet<PromotionRuleUsage> PromotionRuleUsages => Set<PromotionRuleUsage>();
+    public DbSet<DistributorProductPrice> DistributorProductPrices => Set<DistributorProductPrice>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -240,6 +241,14 @@ public class DmsDbContext(DbContextOptions<DmsDbContext> options) : DbContext(op
             // 1 dòng duy nhất/ (rule, NPP, tháng) — atomic UPDATE cộng dồn Count qua
             // INSERT ... ON CONFLICT giống InventoryService, không phải đọc-rồi-ghi.
             e.HasIndex(x => new { x.RuleId, x.DistributorId, x.Year, x.Month }).IsUnique();
+        });
+
+        modelBuilder.Entity<DistributorProductPrice>(e =>
+        {
+            e.ToTable("distributor_product_prices");
+            e.Property(x => x.PricePerCase).HasPrecision(12, 2);
+            // 1 NPP chỉ có tối đa 1 giá hợp đồng cho 1 sản phẩm.
+            e.HasIndex(x => new { x.DistributorId, x.ProductId }).IsUnique();
         });
     }
 }
